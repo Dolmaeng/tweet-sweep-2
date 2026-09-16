@@ -32,3 +32,10 @@
 - https://github.com/iteratequickly/Tweet-Removal-Tool
 - https://github.com/ketrewq/tweet-deleter
 - https://twaffle.net/%ED%8A%B8%EC%99%80%ED%94%8C-%EC%B2%AD%EC%86%8C%EA%B8%B0%ED%99%95%EC%9E%A5%ED%98%95-%EA%B0%80%EC%9D%B4%EB%93%9C/ (딜레이 권고·차단 경고)
+
+## 검증된 UI 셀렉터 (2026-09-17, 실제 삭제 성공)
+- 대상 글: 상태 페이지의 첫 `article[data-testid="tweet"]`
+- 더보기(…): `[data-testid="caret"]`. **상태 페이지에서는 이 버튼이 article 요소 바깥(헤더)에 있음** → 문서 전체에서 첫 caret을 잡아야 함
+- 함정: 재게시 버튼은 `aria-haspopup="menu"`를 가짐 → caret 대체 셀렉터로 aria-haspopup 쓰면 재게시 메뉴(`재게시 retweetConfirm | 인용하세요`)를 잘못 엶. 절대 금지
+- 삭제 메뉴 항목: `[role="menuitem"]` 중 텍스트 "삭제"/"Delete"
+- 확인: `[data-testid="confirmationSheetConfirm"]`

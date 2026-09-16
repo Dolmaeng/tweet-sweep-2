@@ -21,7 +21,7 @@
 - [x] T11 `xcom.content.ts` + `executors/ui-click.ts` 페이지 판정·twid 추출. DOM fixture 테스트 — f2d7489
 - [x] T12 `ui-click` 삭제 시퀀스(caret→메뉴→확인, 라벨·타임아웃 설정) — happy-dom 전 단계·오류 분기 테스트 — f2d7489. 셀렉터는 조사 기준 best-effort, T14에서 실제 확인
 - [x] T13 대시보드 "삭제 테스트" 화면(세션 확인·미리보기·단건 삭제, twid 일치 전 삭제 비활성) — 686e974. 라이브 실행은 사용자 승인+테스트 글 필요(T14)
-- [ ] T14 실계정 테스트 게시물 1건 삭제 — AC: `ok`, 감사 로그 1행, DOM 스냅샷 fixture 갱신, DeleteTweet 응답의 L·W·R 실측값 기록 → SRS §6 표 확정
+- [x] T14 실계정 테스트 게시물 1건 삭제 성공(2026-09-17). 셀렉터 확정 → `docs/learn/x-web-client.md`. 커밋 ec84c67. (L·W·R 헤더 실측값은 사용자 확인 대기)
 - 사용자 입력: 테스트 게시물 1건, 실행 승인
 
 ## M3 v1
