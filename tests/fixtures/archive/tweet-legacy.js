@@ -1,0 +1,1 @@
+window.YTD.tweet.part0 = [ { "tweet" : { "id_str" : "5", "id" : "5", "created_at" : "Thu Jan 01 00:00:00 +0000 2015", "full_text" : "legacy prefix", "favorite_count" : "0", "retweet_count" : "0" } } ]

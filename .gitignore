@@ -1,9 +1,9 @@
 
 # 개인 데이터 — 커밋 금지
-data/
-archive/
+/data/
+/archive/
 *.zip
-logs/
+/logs/
 *.jsonl
 !tests/fixtures/**
 .env
