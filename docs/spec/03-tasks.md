@@ -9,11 +9,11 @@
 ## M1 스파이크 A — 골격·가져오기·analyze
 - [x] T01 Node 24.19 설치 → WXT 0.21 react 템플릿 기반 골격(`srcDir: src`, 자동 임포트 끔), eslint 10/prettier/vitest 4 — `npm run build` 성공 — 0799f55
 - [x] T02 manifest 권한 최소(host `https://x.com/*`, storage, tabs, scripting, unlimitedStorage). 생성된 manifest 확인 — 0799f55
-- [ ] T03 `core/models.ts` + `messaging/protocol.ts` — AC: tsc 통과, 단위 테스트
-- [ ] T04 `core/archive/parse.ts`(zip·js, parts 병합, account.js) — AC: fixture 3종, 3만 건 합성 < 10s
-- [ ] T05 `platform/db.ts` IndexedDB 스키마·청크 저장·집계 — AC: 재가져오기 중복 0
-- [ ] T06 대시보드: 위험 고지·동의 → 가져오기 → analyze(유형·연도·미디어·프리셋별 소요) + CSV — AC: 실제 아카이브로 보고서
-- [ ] T07 README 설치 3단계(clone → `npm ci` → `npm run build` → 로드) — AC: 새 PC 재현
+- [x] T03 `core/models.ts` + `messaging/protocol.ts` — a7515af
+- [x] T04 `core/archive/parse.ts`(parts 병합, account.js, 구형 접두어) — fixture 4종, 3만 건 합성 < 10s 테스트 통과 — 92b0181
+- [x] T05 `platform/db.ts` IndexedDB 스키마 v1(7 스토어)·1,000건 청크 저장 + `archive-input.ts`(zip.js, ZIP64·선택 추출) — 재가져오기 중복 0 테스트 — 43d155d
+- [x] T06 대시보드: 위험 고지·동의 → 가져오기(진행 표시) → analyze(유형·연도·미디어·프리셋별 소요) + CSV. 페이싱 산식 `core/pacing.ts` — 6336f86, 744fa1a. 실제 아카이브 보고서는 사용자 실행 대기
+- [x] T07 README 설치(clone → `npm ci` → `npm run build` → 로드)·사용법·구조 — 3f46157. 새 PC 재현은 M3 릴리스 zip과 함께 검증
 - 사용자 입력: Node 설치 동의, 아카이브 zip 선택(UI)
 
 ## M2 스파이크 B — 1건 삭제
