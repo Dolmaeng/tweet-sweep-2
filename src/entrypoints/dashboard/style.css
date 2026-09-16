@@ -8,15 +8,107 @@
     'Malgun Gothic',
     sans-serif;
   line-height: 1.5;
+  --border: light-dark(#d0d7de, #3d444d);
+  --muted: light-dark(#59636e, #9198a1);
+  --accent: light-dark(#1f6feb, #4493f8);
+  --danger: light-dark(#cf222e, #f85149);
+  --card: light-dark(#ffffff, #151b23);
+  --bg: light-dark(#f6f8fa, #0d1117);
 }
 body {
   margin: 0;
+  background: var(--bg);
 }
 .page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 24px 16px 64px;
+}
+.top {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.top h1 {
+  margin: 0;
+  font-size: 22px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+.card h3 {
+  font-size: 15px;
+  margin: 20px 0 6px;
 }
 .muted {
-  opacity: 0.7;
+  color: var(--muted);
+}
+.small {
+  font-size: 13px;
+}
+.error {
+  color: var(--danger);
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+th,
+td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+button.danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+code {
+  font-size: 13px;
 }
