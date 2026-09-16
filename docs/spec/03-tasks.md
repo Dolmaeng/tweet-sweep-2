@@ -7,8 +7,8 @@
 - [x] T00 헌장 v2·SRS v0.2·ADR-0001~0006·plan·tasks — 2026-09-17
 
 ## M1 스파이크 A — 골격·가져오기·analyze
-- [ ] T01 Node LTS 설치 확인 → `npx wxt@latest init`(react-ts) → `.nvmrc`, eslint/prettier, vitest — AC: `npm run dev`로 빈 확장 로드
-- [ ] T02 manifest 권한 최소(host `https://x.com/*`, storage, tabs, scripting, unlimitedStorage) — AC: 설치 시 권한 목록 확인
+- [x] T01 Node 24.19 설치 → WXT 0.21 react 템플릿 기반 골격(`srcDir: src`, 자동 임포트 끔), eslint 10/prettier/vitest 4 — `npm run build` 성공 — 0799f55
+- [x] T02 manifest 권한 최소(host `https://x.com/*`, storage, tabs, scripting, unlimitedStorage). 생성된 manifest 확인 — 0799f55
 - [ ] T03 `core/models.ts` + `messaging/protocol.ts` — AC: tsc 통과, 단위 테스트
 - [ ] T04 `core/archive/parse.ts`(zip·js, parts 병합, account.js) — AC: fixture 3종, 3만 건 합성 < 10s
 - [ ] T05 `platform/db.ts` IndexedDB 스키마·청크 저장·집계 — AC: 재가져오기 중복 0
