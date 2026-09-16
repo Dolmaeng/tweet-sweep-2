@@ -58,18 +58,20 @@ tweet-sweep-2/
 5. `[data-testid="confirmationSheetConfirm"]` 클릭 → 3s 내 글 제거 또는 확인 토스트 → `ok`. 오류 토스트(문제 발생/Rate limit) → `blocked`
 6. 단계별 타임아웃, 스크린샷 없음(개인정보). 실패 시 단계 이름을 `detail`에 기록
 
-## 5. 안전 엔진
-- `pacing.ts`: 프리셋 표(SRS §6) → `nextDelayMs()` 균등 무작위 + 5% 긴 휴식(5~15분). 워밍업 계수(일차별). 활동 시간대 밖이면 다음 시작 시각 계산
-- 하드 상한 상수 `HARD_MAX_PER_15MIN=30` · `HARD_MAX_PER_DAY=1500` · `HARD_MIN_DELAY_MS=20000`. 설정 로드 시 초과값 거부
-- `breaker.ts`: CLOSED →(blocked 1회)→ COOLING(15분+여유, 사람 재시작) → 같은 날 2회 → HALTED_TODAY + 프리셋 하향 · auth_redirect/lock → HALTED(사람 확인) · error 연속 3 → HALTED
+## 5. 안전 엔진 (ADR-0007 적응형)
+- `pacing.ts`: 입력 = 프리셋(u, 플로어) + 관측 예산(L, W, R, reset) + 워밍업 진행도. `nextDelayMs()` = max(플로어, W÷(u·L)) × 로그노멀(σ 0.35) + 4% 확률 2~8분 휴식. R < (1−u)·L 이면 reset까지 대기. 세션 60~120분마다 10~30분 휴식. 활동 시간대 경계 ±45분 일별 무작위
+- 예산 관측: `background.ts`의 webRequest `onCompleted`(`/i/api/graphql/*DeleteTweet*`)에서 `x-rate-limit-limit/-remaining/-reset` 파싱 → 대시보드에 `BUDGET` 메시지. 미관측 시 L=50·W=900·u=0.3 고정
+- 하드 제약 상수: `HARD_MIN_DELAY_MS=10000` · `HARD_MAX_UTIL=0.7` · `HARD_MAX_PER_DAY=5000` · 동시 1. 설정 로드 시 위반값 거부
+- `breaker.ts`: CLOSED →(429·차단 문구)→ COOLING(reset+5~15분, u−0.1) → 같은 날 2회 HALTED_HOURS(2~4h, u−0.1) → 3회 HALTED_TODAY · auth_redirect/lock → HALTED(사람 확인) · 연속 오류 3 → HALTED
 - `scheduler.ts`: `(state, event, now) → (state, command)` 순수 함수. 대시보드가 command(navigate/execute/wait/stop)를 수행
+- 하지 않는 것: UA·IP 변경, 재로그인, 위장 활동, 외부 전송(ADR-0007)
 
 ## 6. 가져오기·analyze
 - 대시보드 파일 입력: zip(`fflate`로 `data/tweets*.js`·`data/account.js`만 추출) 또는 개별 파일. 첫 `=` 이후 JSON 파싱, 1,000건 단위 트랜잭션 저장
 - 분류 규칙 SRS FR-02. `analyze` 집계: 유형별·연도별·미디어·프리셋별 소요. CSV 내보내기(Blob 다운로드)
 
 ## 7. 테스트
-- 단위(Vitest): 파서(합성 fixture 3종) · 필터 조합 · pacing(속성: 어떤 설정도 하드 상한 초과 불가) · breaker 전이표 · scheduler 시나리오(재개·중복 0)
+- 단위(Vitest): 파서(합성 fixture 3종) · 필터 조합 · pacing(속성: 어떤 설정·관측값에서도 간격 ≥10s, u ≤0.7, 일 ≤5,000; 분포 검정) · breaker 전이표 · scheduler 시나리오(재개·중복 0·예산 고갈 대기)
 - 실행기: happy-dom에 X 글 페이지 DOM 스냅샷(개인정보 제거) 로드 → 단계별 셀렉터 동작 검증. X 변경 시 스냅샷 갱신
 - 수동: M2 테스트 게시물 1건. 라이브 run은 사용자 요청 시만, 첫 실행 ≤50건
 
@@ -87,7 +89,7 @@ tweet-sweep-2/
 |---|---|---|
 | M0 | 헌장·SRS·ADR·plan·tasks | 사용자 승인 |
 | M1 스파이크 A | Node·WXT 골격, 가져오기, analyze | 실제 아카이브 3계정 보고서, 유형별 건수 확정 |
-| M2 스파이크 B | 작업 탭·콘텐츠 스크립트·`ui-click` 1건 | 테스트 게시물 삭제 `ok`, 감사 로그 1행 |
+| M2 스파이크 B | 작업 탭·콘텐츠 스크립트·`ui-click` 1건 + 예산 헤더 실측 | 테스트 게시물 삭제 `ok`, 감사 로그 1행, L·W 기록 → SRS §6 표 확정 |
 | M3 v1 | plan/run/일시정지/재개·페이싱·회로차단·설정·내보내기·릴리스 zip | 시나리오 테스트 전부 통과, 첫 주 운영 무사고 |
 | M4 | `graphql-replay`, unretweet/unlike, 백그라운드(alarms) 모드, 아카이브 이후 보충 | 항목별 ADR |
 | M5 v2 | LLM 분류 필터 | ADR |

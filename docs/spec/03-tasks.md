@@ -17,17 +17,17 @@
 - 사용자 입력: Node 설치 동의, 아카이브 zip 선택(UI)
 
 ## M2 스파이크 B — 1건 삭제
-- [ ] T10 `background.ts`: 작업 탭 생성·이동, 메시지 중계, webRequest 관측(429/302) — AC: 모의 신호 단위 테스트
+- [ ] T10 `background.ts`: 작업 탭 생성·이동, 메시지 중계, webRequest 관측(429/302 + `x-rate-limit-*` 예산 헤더) — AC: 모의 신호·헤더 파싱 단위 테스트
 - [ ] T11 `xcom.content.ts`: 페이지 유형 판정(로그인/잠금/없음/글), twid 읽기 — AC: fixture DOM 판정 테스트
 - [ ] T12 `executors/ui-click.ts` 단계 구현 + 셀렉터·라벨 설정 — AC: happy-dom 스냅샷에서 전 단계 통과
 - [ ] T13 대시보드 "단건 실행" 화면(dry-run 기본, 라이브 토글) — AC: dry-run은 클릭 없이 단계 로그만
-- [ ] T14 실계정 테스트 게시물 1건 삭제 — AC: `ok`, 감사 로그 1행, DOM 스냅샷 fixture 갱신
+- [ ] T14 실계정 테스트 게시물 1건 삭제 — AC: `ok`, 감사 로그 1행, DOM 스냅샷 fixture 갱신, DeleteTweet 응답의 L·W·R 실측값 기록 → SRS §6 표 확정
 - 사용자 입력: 테스트 게시물 1건, 실행 승인
 
 ## M3 v1
 - [ ] T20 `core/filters/` 6종 + 조합 테스트
-- [ ] T21 `core/pacing.ts` 프리셋·워밍업·활동시간·하드 상한 — AC: 속성 테스트
-- [ ] T22 `core/breaker.ts` — AC: 전이표 테스트
+- [ ] T21 `core/pacing.ts` 적응형(예산 관측·u·로그노멀 지터·긴 휴식·워밍업·활동시간·하드 제약) — AC: 속성 테스트(간격 ≥10s, u ≤0.7, 일 ≤5,000), 분포 검정
+- [ ] T22 `core/breaker.ts` 사다리식(429 1·2·3회, 인증·잠금, 연속 오류) — AC: 전이표 테스트
 - [ ] T23 `core/scheduler.ts` + 대시보드 run 루프(일시정지·중단·재개) — AC: 강제 종료 후 중복 0
 - [ ] T24 plan 화면(필터 UI·목록·CSV) — AC: dry-run 기본
 - [ ] T25 감사 로그·내보내기(JSONL/CSV), 진행률·다음 실행 시각 — AC: 항목별 1행
