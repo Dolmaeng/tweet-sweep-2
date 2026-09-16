@@ -1,0 +1,148 @@
+// 실행 루프 (plan §5, ADR-0004). 결정은 코어(scheduler·breaker·pacing)에 위임하고,
+// 이 파일은 작업 탭 구동·저장·이벤트 방출만 한다. 대시보드가 열려 있는 동안만 돈다.
+import {
+  initialBreaker,
+  reduceBreaker,
+  type BreakerEvent,
+  type BreakerState,
+} from '../core/breaker';
+import type { ExecutionResult, Job, Signal } from '../core/models';
+import { PRESETS, type RateBudget } from '../core/pacing';
+import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
+import { statusUrl } from '../core/xurl';
+import { DEFAULT_UI_CONFIG } from '../executors/types';
+import { itemStatusOf, markItem, nextPending, pendingCount, setJobStatus } from './db';
+import { deleteOnTab, ensureWorker, navigate, probeSettled, type Worker } from './worker-tab';
+
+export interface RunControls {
+  isPaused(): boolean;
+  isStopped(): boolean;
+}
+
+export interface BudgetSnapshot {
+  budget: RateBudget;
+  remaining: number | null;
+  /** 지난 호출 이후 429가 있었으면 true(소비). */
+  takeRateLimit(): boolean;
+}
+
+export type RunEvent =
+  | { type: 'item'; postId: string; result: ExecutionResult; removedCount: number; at: number }
+  | { type: 'waiting'; reason: string; untilMs: number }
+  | { type: 'running' }
+  | { type: 'ended'; reason: string; completed: boolean };
+
+export interface RunContext {
+  job: Job;
+  username: string;
+  activeStartHour: number;
+  activeEndHour: number;
+}
+
+const MAX_WAIT_SLICE = 60_000;
+
+export async function runJob(
+  ctx: RunContext,
+  controls: RunControls,
+  budgetSource: () => BudgetSnapshot,
+  onEvent: (ev: RunEvent) => void,
+): Promise<void> {
+  let breaker: BreakerState = initialBreaker;
+  let deletedSoFar = ctx.job.removedCount;
+  const preset = PRESETS[ctx.job.preset];
+  let worker: Worker | null = null;
+
+  await setJobStatus(ctx.job.id, 'running');
+  onEvent({ type: 'running' });
+
+  for (;;) {
+    if (controls.isStopped()) {
+      await setJobStatus(ctx.job.id, 'paused');
+      onEvent({ type: 'ended', reason: '사용자 중지', completed: false });
+      return;
+    }
+
+    const pending = await pendingCount(ctx.job.id);
+    const { budget, remaining, takeRateLimit } = budgetSource();
+    const snap: RunSnapshot = {
+      pending,
+      deletedSoFar,
+      breaker,
+      budget,
+      remaining,
+      preset,
+      activeStartHour: ctx.activeStartHour,
+      activeEndHour: ctx.activeEndHour,
+      paused: controls.isPaused(),
+    };
+    const cmd = decide(snap, Date.now());
+
+    if (cmd.type === 'done') {
+      await setJobStatus(ctx.job.id, 'completed');
+      onEvent({ type: 'ended', reason: '완료', completed: true });
+      return;
+    }
+    if (cmd.type === 'stop') {
+      await setJobStatus(ctx.job.id, 'halted');
+      onEvent({ type: 'ended', reason: cmd.reason, completed: false });
+      return;
+    }
+    if (cmd.type === 'wait') {
+      onEvent({ type: 'waiting', reason: cmd.reason, untilMs: cmd.untilMs });
+      await sleep(Math.min(cmd.untilMs - Date.now(), MAX_WAIT_SLICE), controls);
+      continue;
+    }
+
+    // cmd.type === 'delete'
+    const postId = await nextPending(ctx.job.id);
+    if (postId === null) continue;
+
+    let result: ExecutionResult;
+    try {
+      worker = await ensureWorker(worker);
+      await navigate(worker.tabId, statusUrl(ctx.username, postId));
+      await probeSettled(worker.tabId);
+      result = await deleteOnTab(worker.tabId, postId, DEFAULT_UI_CONFIG);
+    } catch (e) {
+      result = { kind: 'error', signal: 'unknown_error', detail: (e as Error).message };
+      worker = null; // 다음 회차에 창을 다시 연다
+    }
+
+    const removed = result.kind === 'ok' || result.kind === 'gone';
+    const signal: Signal | null = 'signal' in result ? result.signal : null;
+    const removedCount = await markItem(ctx.job.id, postId, itemStatusOf(result), signal, removed);
+    if (removed) deletedSoFar = removedCount;
+
+    // 백그라운드가 429를 봤으면 그것이 우선(rate-limit 회로차단)
+    const event: BreakerEvent = takeRateLimit()
+      ? { type: 'rate_limit', resetMs: budget.windowSec * 1000 }
+      : toBreakerEvent(result);
+    breaker = reduceBreaker(breaker, event, Date.now());
+
+    onEvent({ type: 'item', postId, result, removedCount, at: Date.now() });
+
+    await sleep(pacingDelayMs(snap), controls);
+  }
+}
+
+function toBreakerEvent(result: ExecutionResult): BreakerEvent {
+  switch (result.kind) {
+    case 'ok':
+      return { type: 'ok' };
+    case 'gone':
+      return { type: 'gone' };
+    case 'blocked':
+      return { type: 'blocked', signal: result.signal };
+    case 'error':
+      return { type: 'error' };
+  }
+}
+
+/** 중단 신호에 반응하는 분할 수면 */
+async function sleep(ms: number, controls: RunControls): Promise<void> {
+  const end = Date.now() + Math.max(0, ms);
+  while (Date.now() < end) {
+    if (controls.isStopped()) return;
+    await new Promise((r) => setTimeout(r, Math.min(500, end - Date.now())));
+  }
+}
