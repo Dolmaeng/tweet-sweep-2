@@ -4,10 +4,13 @@ import type {
   Account,
   ArchiveSummary,
   AuditEvent,
+  ExecutionResult,
   Job,
   JobItem,
+  JobItemStatus,
   Post,
   PostKind,
+  Signal,
 } from '../core/models';
 
 export const DB_NAME = 'tweet-sweep-2';
@@ -139,4 +142,122 @@ export async function deleteAccountData(userId: string): Promise<void> {
     cursor = await cursor.continue();
   }
   await tx.done;
+}
+
+// ── 작업(run) 저장·진행 (plan §2, FR-11a) ──
+
+/** 작업과 대상 항목(pending)을 한 트랜잭션에 생성 */
+export async function createJob(job: Job, targetIds: string[]): Promise<void> {
+  const db = await getDb();
+  const CH = 2000;
+  {
+    const tx = db.transaction('jobs', 'readwrite');
+    await Promise.all([tx.store.put(job), tx.done]);
+  }
+  for (let i = 0; i < targetIds.length; i += CH) {
+    const tx = db.transaction('jobItems', 'readwrite');
+    const slice = targetIds.slice(i, i + CH);
+    await Promise.all([
+      ...slice.map((postId) =>
+        tx.store.put({
+          jobId: job.id,
+          postId,
+          status: 'pending',
+          attempts: 0,
+          lastSignal: null,
+          doneAt: null,
+        }),
+      ),
+      tx.done,
+    ]);
+  }
+}
+
+/** 재개 가능한 작업(계획/진행/일시정지) */
+export async function getResumableJob(userId: string): Promise<Job | undefined> {
+  const db = await getDb();
+  const jobs = await db.getAllFromIndex('jobs', 'byUser', userId);
+  return jobs
+    .filter((j) => j.status === 'planned' || j.status === 'running' || j.status === 'paused')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+}
+
+export async function getJob(jobId: string): Promise<Job | undefined> {
+  const db = await getDb();
+  return db.get('jobs', jobId);
+}
+
+export async function setJobStatus(jobId: string, status: Job['status']): Promise<void> {
+  const db = await getDb();
+  const job = await db.get('jobs', jobId);
+  if (job) await db.put('jobs', { ...job, status });
+}
+
+export async function pendingCount(jobId: string): Promise<number> {
+  const db = await getDb();
+  return db.countFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
+}
+
+/** 다음 pending 항목의 postId(없으면 null). 상태는 바꾸지 않는다 */
+export async function nextPending(jobId: string): Promise<string | null> {
+  const db = await getDb();
+  const item = await db.getFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
+  return item?.postId ?? null;
+}
+
+/** 항목 결과 반영. removed면 job.removedCount 증가. 한 트랜잭션 */
+export async function markItem(
+  jobId: string,
+  postId: string,
+  status: JobItemStatus,
+  signal: Signal | null,
+  removed: boolean,
+): Promise<number> {
+  const db = await getDb();
+  const tx = db.transaction(['jobItems', 'jobs'], 'readwrite');
+  const items = tx.objectStore('jobItems');
+  const jobs = tx.objectStore('jobs');
+  const item = (await items.get([jobId, postId])) as JobItem | undefined;
+  if (item) {
+    const updated: JobItem = {
+      ...item,
+      status,
+      lastSignal: signal,
+      attempts: item.attempts + 1,
+      doneAt: new Date().toISOString(),
+    };
+    await items.put(updated);
+  }
+  const job = (await jobs.get(jobId)) as Job | undefined;
+  let removedCount = job?.removedCount ?? 0;
+  if (job && removed) {
+    removedCount += 1;
+    await jobs.put({ ...job, removedCount });
+  }
+  await tx.done;
+  return removedCount;
+}
+
+export async function appendAudit(ev: AuditEvent): Promise<void> {
+  const db = await getDb();
+  await db.add('audit', ev);
+}
+
+export async function listAudit(jobId: string): Promise<AuditEvent[]> {
+  const db = await getDb();
+  return db.getAllFromIndex('audit', 'byJob', jobId);
+}
+
+/** 결과 → 항목 상태 */
+export function itemStatusOf(result: ExecutionResult): JobItemStatus {
+  switch (result.kind) {
+    case 'ok':
+      return 'done';
+    case 'gone':
+      return 'gone';
+    case 'blocked':
+      return 'blocked';
+    case 'error':
+      return 'failed';
+  }
 }

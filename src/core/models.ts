@@ -50,6 +50,8 @@ export interface Job {
   createdAt: string;
   status: 'planned' | 'running' | 'paused' | 'halted' | 'completed';
   targetCount: number;
+  /** 실제 제거된 수(ok+gone). 실시간 카운터 N (FR-11a) */
+  removedCount: number;
 }
 
 export interface JobItem {
