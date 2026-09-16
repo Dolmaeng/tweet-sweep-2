@@ -5,10 +5,10 @@ import type { PageKind, UiClickConfig } from './types';
 
 export const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** 더보기 버튼 후보. 우선순위 순 */
+// 더보기(…) 버튼. data-testid="caret"가 X의 "More" 트리거. 재게시/답글 버튼과 구별된다.
+// 주의: aria-haspopup 같은 넓은 셀렉터는 재게시 버튼을 잘못 집으니 쓰지 않는다.
 export const CARET_SELECTORS = [
   '[data-testid="caret"]',
-  'button[aria-haspopup="menu"]',
   '[aria-label="More"]',
   '[aria-label="더 보기"]',
 ];
@@ -44,6 +44,14 @@ export function findCaret(scope: ParentNode): HTMLElement | null {
     if (el) return el;
   }
   return null;
+}
+
+/**
+ * 포커스된 글의 더보기 버튼. 상태 페이지에서 X는 그 버튼을 article 밖 헤더에 두기도 한다.
+ * 문서 전체에서는 반드시 data-testid="caret"만 쓴다(왼쪽 내비의 "더 보기"를 집지 않도록).
+ */
+export function findFocusedCaret(doc: Document): HTMLElement | null {
+  return doc.querySelector<HTMLElement>('[data-testid="caret"]');
 }
 
 function itemLabel(el: Element): string {
@@ -110,8 +118,13 @@ export async function deletePost(
   const article = await waitFor(() => findTargetArticle(doc), config.timeouts.element, sleep);
   if (!article) return { kind: 'error', signal: 'timeout', detail: `article(${domCounts(doc)})` };
 
-  // caret은 반드시 대상 글 안에서 찾는다. 다른 글의 caret을 누르면 엉뚱한 글을 지울 수 있다.
-  const caret = await waitFor(() => findCaret(article), config.timeouts.element, sleep);
+  // 대상 글 안의 더보기를 먼저, 없으면 포커스된 글의 더보기(article 밖 헤더)를 쓴다.
+  // 상태 페이지의 첫 caret은 포커스된 글의 것이므로 안전하다.
+  const caret = await waitFor(
+    () => findCaret(article) ?? findFocusedCaret(doc),
+    config.timeouts.element,
+    sleep,
+  );
   if (!caret) return { kind: 'error', signal: 'dom_changed', detail: `caret(${domCounts(doc)})` };
   caret.click();
 

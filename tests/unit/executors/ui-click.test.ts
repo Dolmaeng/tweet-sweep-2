@@ -103,6 +103,34 @@ describe('deletePost', () => {
     expect(confirmClick).toHaveBeenCalledOnce();
   });
 
+  it('finds the focused tweet caret even when it sits outside the article (status page)', async () => {
+    const doc = setBody(`
+      <button data-testid="caret"></button>
+      <article data-testid="tweet"><a href="/u/status/5"></a></article>
+      <div role="menu"><div role="menuitem"><span>삭제</span></div></div>
+      <button data-testid="confirmationSheetConfirm"></button>
+    `);
+    const caret = doc.querySelector<HTMLElement>('[data-testid="caret"]')!;
+    const caretClick = vi.spyOn(caret, 'click');
+    const result = await deletePost(doc, '/u/status/5', '5', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({ kind: 'ok' });
+    expect(caretClick).toHaveBeenCalledOnce();
+  });
+
+  it('does not treat a repost button as the more-menu caret', async () => {
+    // 재게시 버튼은 aria-haspopup을 갖지만 caret이 아니다 → 잘못 눌러선 안 된다
+    const doc = setBody(`
+      <article data-testid="tweet">
+        <a href="/u/status/6"></a>
+        <button data-testid="retweet" aria-haspopup="menu" aria-label="재게시"></button>
+      </article>
+    `);
+    const fast = { labels: ['삭제'], timeouts: { element: 20, confirm: 20 } };
+    const result = await deletePost(doc, '/u/status/6', '6', fast, noSleep);
+    expect(result.kind).toBe('error'); // caret을 못 찾아 멈춤(재게시 버튼을 누르지 않음)
+    if (result.kind === 'error') expect(result.detail).toMatch(/^caret\(/);
+  });
+
   it('maps a deleted post to gone and a login redirect to blocked', async () => {
     const gone = await deletePost(
       setBody('<div data-testid="error-detail"></div>'),
