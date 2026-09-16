@@ -17,10 +17,10 @@
 - 사용자 입력: Node 설치 동의, 아카이브 zip 선택(UI)
 
 ## M2 스파이크 B — 1건 삭제
-- [ ] T10 `background.ts`: 작업 탭 생성·이동, 메시지 중계, webRequest 관측(429/302 + `x-rate-limit-*` 예산 헤더) — AC: 모의 신호·헤더 파싱 단위 테스트
-- [ ] T11 `xcom.content.ts`: 페이지 유형 판정(로그인/잠금/없음/글), twid 읽기 — AC: fixture DOM 판정 테스트
-- [ ] T12 `executors/ui-click.ts` 단계 구현 + 셀렉터·라벨 설정 — AC: happy-dom 스냅샷에서 전 단계 통과
-- [ ] T13 대시보드 "단건 실행" 화면(dry-run 기본, 라이브 토글) — AC: dry-run은 클릭 없이 단계 로그만
+- [x] T10 `background.ts` webRequest 관측(DeleteTweet 429 + `x-rate-limit-*`)·대시보드 열기 + `worker-tab.ts`(탭 생성·이동·메시지). 헤더 파싱 `core/ratelimit.ts` 테스트 — 1caf2fc, d56fbc3. 라이브 관측은 T14
+- [x] T11 `xcom.content.ts` + `executors/ui-click.ts` 페이지 판정·twid 추출. DOM fixture 테스트 — f2d7489
+- [x] T12 `ui-click` 삭제 시퀀스(caret→메뉴→확인, 라벨·타임아웃 설정) — happy-dom 전 단계·오류 분기 테스트 — f2d7489. 셀렉터는 조사 기준 best-effort, T14에서 실제 확인
+- [x] T13 대시보드 "삭제 테스트" 화면(세션 확인·미리보기·단건 삭제, twid 일치 전 삭제 비활성) — 686e974. 라이브 실행은 사용자 승인+테스트 글 필요(T14)
 - [ ] T14 실계정 테스트 게시물 1건 삭제 — AC: `ok`, 감사 로그 1행, DOM 스냅샷 fixture 갱신, DeleteTweet 응답의 L·W·R 실측값 기록 → SRS §6 표 확정
 - 사용자 입력: 테스트 게시물 1건, 실행 승인
 
