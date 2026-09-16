@@ -1,0 +1,23 @@
+# Node / 빌드
+node_modules/
+.output/
+.wxt/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 개인 데이터 — 커밋 금지
+data/
+archive/
+*.zip
+logs/
+*.jsonl
+!tests/fixtures/**
+.env
+.env.*
+
+# OS / IDE
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
