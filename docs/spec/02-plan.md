@@ -61,7 +61,7 @@ tweet-sweep-2/
 ## 5. 안전 엔진 (ADR-0007 적응형)
 - `pacing.ts`: 입력 = 프리셋(u, 플로어) + 관측 예산(L, W, R, reset) + 워밍업 진행도. `nextDelayMs()` = max(플로어, W÷(u·L)) × 로그노멀(σ 0.35) + 4% 확률 2~8분 휴식. R < (1−u)·L 이면 reset까지 대기. 세션 60~120분마다 10~30분 휴식. 활동 시간대 경계 ±45분 일별 무작위
 - 예산 관측: `background.ts`의 webRequest `onCompleted`(`/i/api/graphql/*DeleteTweet*`)에서 `x-rate-limit-limit/-remaining/-reset` 파싱 → 대시보드에 `BUDGET` 메시지. 미관측 시 L=50·W=900·u=0.3 고정
-- 하드 제약 상수: `HARD_MIN_DELAY_MS=10000` · `HARD_MAX_UTIL=0.7` · `HARD_MAX_PER_DAY=5000` · 동시 1. 설정 로드 시 위반값 거부
+- 하드 제약 상수: `HARD_MIN_DELAY_MS=5000` · `HARD_MAX_UTIL=0.7` · `HARD_MAX_PER_DAY=8000`(ADR-0008) · 동시 1. 설정 로드 시 위반값 거부
 - `breaker.ts`: CLOSED →(429·차단 문구)→ COOLING(reset+5~15분, u−0.1) → 같은 날 2회 HALTED_HOURS(2~4h, u−0.1) → 3회 HALTED_TODAY · auth_redirect/lock → HALTED(사람 확인) · 연속 오류 3 → HALTED
 - `scheduler.ts`: `(state, event, now) → (state, command)` 순수 함수. 대시보드가 command(navigate/execute/wait/stop)를 수행
 - 하지 않는 것: UA·IP 변경, 재로그인, 위장 활동, 외부 전송(ADR-0007)
@@ -71,7 +71,7 @@ tweet-sweep-2/
 - 분류 규칙 SRS FR-02. `analyze` 집계: 유형별·연도별·미디어·프리셋별 소요. CSV 내보내기(Blob 다운로드)
 
 ## 7. 테스트
-- 단위(Vitest): 파서(합성 fixture 3종) · 필터 조합 · pacing(속성: 어떤 설정·관측값에서도 간격 ≥10s, u ≤0.7, 일 ≤5,000; 분포 검정) · breaker 전이표 · scheduler 시나리오(재개·중복 0·예산 고갈 대기)
+- 단위(Vitest): 파서(합성 fixture 3종) · 필터 조합 · pacing(속성: 어떤 설정·관측값에서도 간격 ≥5s, u ≤0.7, 일 ≤8,000; 분포 검정) · breaker 전이표 · scheduler 시나리오(재개·중복 0·예산 고갈 대기)
 - 실행기: happy-dom에 X 글 페이지 DOM 스냅샷(개인정보 제거) 로드 → 단계별 셀렉터 동작 검증. X 변경 시 스냅샷 갱신
 - 수동: M2 테스트 게시물 1건. 라이브 run은 사용자 요청 시만, 첫 실행 ≤50건
 
