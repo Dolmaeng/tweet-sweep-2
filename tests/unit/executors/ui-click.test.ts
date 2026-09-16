@@ -80,6 +80,7 @@ describe('element finders', () => {
     const byTestid = setBody('<div role="menuitem" data-testid="삭제"></div>');
     expect(findDeleteMenuItem(byTestid, ['삭제'])).not.toBeNull();
   });
+});
 
 describe('deletePost', () => {
   it('walks caret → delete → confirm and returns ok', async () => {
