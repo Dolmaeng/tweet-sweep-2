@@ -73,7 +73,13 @@ describe('element finders', () => {
     );
     expect(findCaret(findTargetArticle(doc)!)).not.toBeNull();
   });
-});
+
+  it('matches a delete item by aria-label or data-testid, not only text', () => {
+    const byAria = setBody('<div role="menuitem" aria-label="Delete"></div>');
+    expect(findDeleteMenuItem(byAria, ['Delete'])).not.toBeNull();
+    const byTestid = setBody('<div role="menuitem" data-testid="삭제"></div>');
+    expect(findDeleteMenuItem(byTestid, ['삭제'])).not.toBeNull();
+  });
 
 describe('deletePost', () => {
   it('walks caret → delete → confirm and returns ok', async () => {

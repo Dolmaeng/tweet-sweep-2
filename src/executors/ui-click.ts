@@ -46,9 +46,23 @@ export function findCaret(scope: ParentNode): HTMLElement | null {
   return null;
 }
 
+function itemLabel(el: Element): string {
+  const text = (el.textContent ?? '').trim();
+  const aria = el.getAttribute('aria-label') ?? '';
+  const testid = el.getAttribute('data-testid') ?? '';
+  return `${text} ${aria} ${testid}`;
+}
+
 export function findDeleteMenuItem(doc: Document, labels: string[]): HTMLElement | null {
   const items = Array.from(doc.querySelectorAll<HTMLElement>('[role="menuitem"]'));
-  return items.find((el) => labels.some((l) => el.textContent?.trim().includes(l))) ?? null;
+  return items.find((el) => labels.some((l) => itemLabel(el).includes(l))) ?? null;
+}
+
+/** 열린 메뉴 항목들의 라벨 목록(진단용) */
+export function menuLabels(doc: Document): string {
+  return Array.from(doc.querySelectorAll('[role="menuitem"]'))
+    .map((el) => itemLabel(el).replace(/\s+/g, ' ').trim().slice(0, 24) || '?')
+    .join(' | ');
 }
 
 export function findConfirm(doc: Document): HTMLElement | null {
@@ -106,7 +120,8 @@ export async function deletePost(
     config.timeouts.element,
     sleep,
   );
-  if (!item) return { kind: 'error', signal: 'dom_changed', detail: `menuitem(${domCounts(doc)})` };
+  if (!item)
+    return { kind: 'error', signal: 'dom_changed', detail: `menuitem[${menuLabels(doc)}]` };
   item.click();
 
   const confirm = await waitFor(() => findConfirm(doc), config.timeouts.confirm, sleep);
