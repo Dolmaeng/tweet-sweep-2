@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialBreaker, type BreakerState } from '../../../src/core/breaker';
-import { DEFAULT_BUDGET, PRESETS } from '../../../src/core/pacing';
+import { DEFAULT_BUDGET, HARD_MIN_DELAY_MS, PRESETS } from '../../../src/core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../../../src/core/scheduler';
 
 const NOON = new Date(2026, 8, 17, 12, 0, 0).getTime();
@@ -58,6 +58,6 @@ describe('decide', () => {
 
 describe('pacingDelayMs', () => {
   it('produces a delay at least the hard minimum', () => {
-    expect(pacingDelayMs(snap(), () => 0.5)).toBeGreaterThanOrEqual(10_000);
+    expect(pacingDelayMs(snap(), () => 0.5)).toBeGreaterThanOrEqual(HARD_MIN_DELAY_MS);
   });
 });
