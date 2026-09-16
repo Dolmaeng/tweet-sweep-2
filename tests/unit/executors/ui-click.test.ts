@@ -7,7 +7,7 @@ import {
   findCaret,
   findConfirm,
   findDeleteMenuItem,
-  findPrimaryArticle,
+  findTargetArticle,
 } from '../../../src/executors/ui-click';
 
 const noSleep = () => Promise.resolve();
@@ -58,13 +58,20 @@ const TWEET_PAGE = `
 `;
 
 describe('element finders', () => {
-  it('finds the article matching the post id, its caret, delete item, and confirm', () => {
+  it('finds the first tweet article, its caret, delete item, and confirm', () => {
     const doc = setBody(TWEET_PAGE);
-    const article = findPrimaryArticle(doc, '999');
+    const article = findTargetArticle(doc);
     expect(article).not.toBeNull();
     expect(findCaret(article!)).not.toBeNull();
     expect(findDeleteMenuItem(doc, DEFAULT_UI_CONFIG.labels)?.textContent?.trim()).toBe('삭제');
     expect(findConfirm(doc)).not.toBeNull();
+  });
+
+  it('finds a caret by aria-label fallback when the testid is absent', () => {
+    const doc = setBody(
+      '<article data-testid="tweet"><button aria-label="더 보기"></button></article>',
+    );
+    expect(findCaret(findTargetArticle(doc)!)).not.toBeNull();
   });
 });
 
@@ -103,9 +110,14 @@ describe('deletePost', () => {
     expect(blocked).toEqual({ kind: 'blocked', signal: 'auth_redirect' });
   });
 
-  it('reports the failing step when the caret is missing', async () => {
+  it('reports the failing step with DOM counts when the caret is missing', async () => {
     const doc = setBody('<article data-testid="tweet"><a href="/u/status/1"></a></article>');
-    const result = await deletePost(doc, '/u/status/1', '1', DEFAULT_UI_CONFIG, noSleep);
-    expect(result).toEqual({ kind: 'error', signal: 'dom_changed', detail: 'caret' });
+    const fast = { labels: ['삭제'], timeouts: { element: 20, confirm: 20 } };
+    const result = await deletePost(doc, '/u/status/1', '1', fast, noSleep);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.signal).toBe('dom_changed');
+      expect(result.detail).toMatch(/^caret\(articles=1,carets=0,menuitems=0\)$/);
+    }
   });
 });

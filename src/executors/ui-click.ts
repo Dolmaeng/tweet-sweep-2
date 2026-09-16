@@ -1,9 +1,17 @@
 // ui-click 실행기 (ADR-0005 기본). 로그인 세션의 실제 UI를 눌러 삭제한다.
-// 셀렉터는 2026-09 조사 기준 best-effort. 실제 확인은 T14. 설정으로 라벨을 덮어쓸 수 있다.
+// 셀렉터는 2026-09 조사 기준. 설정으로 라벨을 덮어쓸 수 있고, 실패 시 진단 수치를 detail에 담는다.
 import type { ExecutionResult } from '../core/models';
 import type { PageKind, UiClickConfig } from './types';
 
 export const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** 더보기 버튼 후보. 우선순위 순 */
+export const CARET_SELECTORS = [
+  '[data-testid="caret"]',
+  'button[aria-haspopup="menu"]',
+  '[aria-label="More"]',
+  '[aria-label="더 보기"]',
+];
 
 /** twid 쿠키(`u%3D<id>`)에서 사용자 id 추출 (FR-03) */
 export function extractTwid(cookie: string): string | null {
@@ -22,15 +30,20 @@ export function detectPageKind(doc: Document, pathname: string): PageKind {
   return 'unknown';
 }
 
-/** 대상 글의 article 요소. status 링크가 일치하는 것 우선, 없으면 첫 article */
-export function findPrimaryArticle(doc: Document, postId: string): Element | null {
-  const articles = Array.from(doc.querySelectorAll('article[data-testid="tweet"]'));
-  const withLink = articles.find((a) => a.querySelector(`a[href*="/status/${postId}"]`));
-  return withLink ?? articles[0] ?? null;
+/**
+ * 삭제 대상 글. 상태 페이지(x.com/user/status/id)로 직접 이동했으므로 대상은 첫 번째 글이다.
+ * 링크 매칭으로 답글을 잘못 고르지 않도록 첫 article을 쓴다.
+ */
+export function findTargetArticle(doc: Document): Element | null {
+  return doc.querySelector('article[data-testid="tweet"]');
 }
 
-export function findCaret(article: Element): HTMLElement | null {
-  return article.querySelector('[data-testid="caret"]');
+export function findCaret(scope: ParentNode): HTMLElement | null {
+  for (const sel of CARET_SELECTORS) {
+    const el = scope.querySelector<HTMLElement>(sel);
+    if (el) return el;
+  }
+  return null;
 }
 
 export function findDeleteMenuItem(doc: Document, labels: string[]): HTMLElement | null {
@@ -56,9 +69,16 @@ async function waitFor<T>(
   }
 }
 
+function domCounts(doc: Document): string {
+  const articles = doc.querySelectorAll('article[data-testid="tweet"]').length;
+  const carets = doc.querySelectorAll('[data-testid="caret"]').length;
+  const menuitems = doc.querySelectorAll('[role="menuitem"]').length;
+  return `articles=${articles},carets=${carets},menuitems=${menuitems}`;
+}
+
 /**
- * 한 건 삭제: 페이지 판정 → article → caret → 삭제 메뉴 → 확인.
- * 클릭·대기는 주입된 sleep으로 테스트 가능. 결과는 ok/gone/blocked/error.
+ * 한 건 삭제: 페이지 판정 → 첫 글 → caret → 삭제 메뉴 → 확인.
+ * 각 단계 실패 시 signal과 진단 수치를 담는다. 클릭·대기는 주입된 sleep으로 테스트 가능.
  */
 export async function deletePost(
   doc: Document,
@@ -73,15 +93,12 @@ export async function deletePost(
   if (kind === 'locked') return { kind: 'blocked', signal: 'account_locked' };
   if (kind !== 'tweet') return { kind: 'error', signal: 'dom_changed', detail: `page:${kind}` };
 
-  const article = await waitFor(
-    () => findPrimaryArticle(doc, postId),
-    config.timeouts.element,
-    sleep,
-  );
-  if (!article) return { kind: 'error', signal: 'timeout', detail: 'article' };
+  const article = await waitFor(() => findTargetArticle(doc), config.timeouts.element, sleep);
+  if (!article) return { kind: 'error', signal: 'timeout', detail: `article(${domCounts(doc)})` };
 
-  const caret = findCaret(article);
-  if (!caret) return { kind: 'error', signal: 'dom_changed', detail: 'caret' };
+  // caret은 반드시 대상 글 안에서 찾는다. 다른 글의 caret을 누르면 엉뚱한 글을 지울 수 있다.
+  const caret = await waitFor(() => findCaret(article), config.timeouts.element, sleep);
+  if (!caret) return { kind: 'error', signal: 'dom_changed', detail: `caret(${domCounts(doc)})` };
   caret.click();
 
   const item = await waitFor(
@@ -89,7 +106,7 @@ export async function deletePost(
     config.timeouts.element,
     sleep,
   );
-  if (!item) return { kind: 'error', signal: 'dom_changed', detail: 'menuitem' };
+  if (!item) return { kind: 'error', signal: 'dom_changed', detail: `menuitem(${domCounts(doc)})` };
   item.click();
 
   const confirm = await waitFor(() => findConfirm(doc), config.timeouts.confirm, sleep);
