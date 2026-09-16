@@ -3,12 +3,14 @@ import type { ExecutionResult, Job } from '../../../core/models';
 import type { AccountRecord } from '../../../platform/db';
 import { getJob } from '../../../platform/db';
 import { runJob, type RunControls, type RunEvent } from '../../../platform/runner';
+import type { RunSettings } from '../../../core/settings';
 import { useBudget } from '../lib/budget';
 import { fmtInt } from '../lib/format';
 
 interface Props {
   account: AccountRecord;
   job: Job;
+  settings: RunSettings;
   onBack: () => void;
 }
 
@@ -20,13 +22,23 @@ interface FeedLine {
 
 const FEED_CAP = 300;
 
-export function LiveRun({ account, job, onBack }: Props) {
+function fmtClock(ms: number): string {
+  const d = new Date(ms);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const hm = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+
+export function LiveRun({ account, job, settings, onBack }: Props) {
   const { view, source } = useBudget();
   const [running, setRunning] = useState(false);
   const [removed, setRemoved] = useState(job.removedCount);
   const [feed, setFeed] = useState<FeedLine[]>([]);
   const [status, setStatus] = useState<string>('대기 중');
   const [ended, setEnded] = useState<string | null>(null);
+  /** 스케줄러 대기(활동 시간대 밖·예산 소진 등). 페이싱 수면과 구분해 크게 표시 */
+  const [waiting, setWaiting] = useState<{ reason: string; untilMs: number } | null>(null);
+  const [nextAt, setNextAt] = useState<number | null>(null);
 
   const paused = useRef(false);
   const stopped = useRef(false);
@@ -56,7 +68,13 @@ export function LiveRun({ account, job, onBack }: Props) {
       isStopped: () => stopped.current,
     };
     void runJob(
-      { job, username: account.username, activeStartHour: 9, activeEndHour: 23 },
+      {
+        job,
+        username: account.username,
+        activeStartHour: settings.activeStartHour,
+        activeEndHour: settings.activeEndHour,
+        ...(settings.floorSec !== null ? { floorMs: settings.floorSec * 1000 } : {}),
+      },
       controls,
       source,
       onEvent,
@@ -67,19 +85,28 @@ export function LiveRun({ account, job, onBack }: Props) {
     switch (ev.type) {
       case 'running':
         setStatus('삭제 중');
+        setWaiting(null);
         break;
       case 'item':
         setRemoved(ev.removedCount);
         setStatus('삭제 중');
+        setWaiting(null);
         setFeed((f) =>
           [{ at: ev.at, postId: ev.postId, result: ev.result }, ...f].slice(0, FEED_CAP),
         );
         break;
       case 'waiting':
         setStatus(`대기: ${ev.reason}`);
+        setWaiting({ reason: ev.reason, untilMs: ev.untilMs });
+        setNextAt(null);
+        break;
+      case 'sleeping':
+        setNextAt(ev.untilMs);
         break;
       case 'ended':
         setRunning(false);
+        setWaiting(null);
+        setNextAt(null);
         setEnded(ev.reason);
         setStatus(ev.completed ? '완료' : `중단: ${ev.reason}`);
         break;
@@ -98,7 +125,19 @@ export function LiveRun({ account, job, onBack }: Props) {
       <div className="bar">
         <div className="bar-fill" style={{ width: `${pct}%` }} />
       </div>
-      <p className="muted small">상태: {status}</p>
+      <p className="muted small">
+        상태: {status}
+        {nextAt !== null && !waiting ? ` · 다음 삭제 ${fmtClock(nextAt)}` : ''}
+      </p>
+      {waiting && (
+        <div className="notice" role="status">
+          <b>지금은 삭제하지 않고 기다리는 중입니다.</b> 이유: {waiting.reason}. 재개 예정{' '}
+          {fmtClock(waiting.untilMs)}
+          {waiting.reason === '활동 시간대 밖'
+            ? ` (활동 시간대 ${settings.activeStartHour}~${settings.activeEndHour}시, 설정에서 변경 가능)`
+            : ''}
+        </div>
+      )}
 
       <div className="actions">
         {!running ? (

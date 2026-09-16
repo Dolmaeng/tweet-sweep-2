@@ -7,7 +7,7 @@ import {
   type BreakerState,
 } from '../core/breaker';
 import type { ExecutionResult, Job, Signal } from '../core/models';
-import { PRESETS, type RateBudget } from '../core/pacing';
+import { HARD_MIN_DELAY_MS, PRESETS, type RateBudget } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { statusUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
@@ -29,6 +29,8 @@ export interface BudgetSnapshot {
 export type RunEvent =
   | { type: 'item'; postId: string; result: ExecutionResult; removedCount: number; at: number }
   | { type: 'waiting'; reason: string; untilMs: number }
+  /** 한 건 처리 후 다음 삭제까지 페이싱 수면 */
+  | { type: 'sleeping'; untilMs: number }
   | { type: 'running' }
   | { type: 'ended'; reason: string; completed: boolean };
 
@@ -37,6 +39,8 @@ export interface RunContext {
   username: string;
   activeStartHour: number;
   activeEndHour: number;
+  /** 사용자 지정 간격 플로어(ms). 프리셋 플로어보다 클 때만 의미 있음 */
+  floorMs?: number;
 }
 
 const MAX_WAIT_SLICE = 60_000;
@@ -49,7 +53,8 @@ export async function runJob(
 ): Promise<void> {
   let breaker: BreakerState = initialBreaker;
   let deletedSoFar = ctx.job.removedCount;
-  const preset = PRESETS[ctx.job.preset];
+  const base = PRESETS[ctx.job.preset];
+  const preset = ctx.floorMs ? { ...base, floorMs: Math.max(base.floorMs, ctx.floorMs) } : base;
   let worker: Worker | null = null;
 
   await setJobStatus(ctx.job.id, 'running');
@@ -97,6 +102,7 @@ export async function runJob(
     const postId = await nextPending(ctx.job.id);
     if (postId === null) continue;
 
+    const startedAt = Date.now();
     let result: ExecutionResult;
     try {
       worker = await ensureWorker(worker);
@@ -121,7 +127,11 @@ export async function runJob(
 
     onEvent({ type: 'item', postId, result, removedCount, at: Date.now() });
 
-    await sleep(pacingDelayMs(snap), controls);
+    // 간격은 '시작 시각 간 간격'(cadence). 탐색·클릭에 쓴 시간을 빼되 하드 최소는 지킨다
+    const elapsed = Date.now() - startedAt;
+    const delay = Math.max(HARD_MIN_DELAY_MS - elapsed, pacingDelayMs(snap) - elapsed, 0);
+    onEvent({ type: 'sleeping', untilMs: Date.now() + delay });
+    await sleep(delay, controls);
   }
 }
 
