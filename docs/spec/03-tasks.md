@@ -25,10 +25,10 @@
 - 사용자 입력: 테스트 게시물 1건, 실행 승인
 
 ## M3 v1
-- [ ] T20 `core/filters/` 6종 + 조합 테스트
-- [ ] T21 `core/pacing.ts` 적응형(예산 관측·u·로그노멀 지터·긴 휴식·워밍업·활동시간·하드 제약) — AC: 속성 테스트(간격 ≥10s, u ≤0.7, 일 ≤5,000), 분포 검정
-- [ ] T22 `core/breaker.ts` 사다리식(429 1·2·3회, 인증·잠금, 연속 오류) — AC: 전이표 테스트
-- [ ] T23 `core/scheduler.ts` + 대시보드 run 루프(일시정지·중단·재개) — AC: 강제 종료 후 중복 0
+- [x] T20 `core/filters.ts` 6조건(유형·기간·키워드·정규식·보존id·지표임계) 조합 + 테스트
+- [x] T21 `core/pacing.ts` 런타임(워밍업 u·로그노멀 지터·4% 긴 휴식·활동시간·예산 감시·하드 최소 10s) + 테스트
+- [x] T22 `core/breaker.ts` 순수 reducer(429 cooling→halted_hours→halted, 잠금·연속오류 즉시 halted) + 전이 테스트
+- [x] T23a `core/scheduler.ts` 결정 함수(halt·cooling·활동시간·예산·일시정지·done→delete) + 테스트. [ ] T23b 대시보드 run 루프·persistence는 다음
 - [ ] T24 plan 화면(필터 UI·목록·CSV) — AC: dry-run 기본
 - [ ] T25 감사 로그·내보내기(JSONL/CSV) + 실시간 피드(삭제마다 1행 즉시) + 카운터 `deleted N of M tweets`·잔여 예상·다음 실행 시각 — AC: 항목별 1행, 카운터가 결과 수신 즉시 갱신(FR-11a)
 - [ ] T26 설정 화면(프리셋·시간대·실행기·라벨·셀렉터) + 하드 상한 거부 — AC: 초과값 저장 불가
