@@ -1,5 +1,5 @@
-// 적응형 페이싱의 기본 산식 (SRS §6, ADR-0007). M1은 예상 소요 계산만, 지터·워밍업·예산 추적은 T21.
-import type { PresetName } from './models';
+// 적응형 페이싱 (SRS §6, ADR-0007): 예상 소요 산식 + 런타임 지터·워밍업·예산 감시.
+import type { PresetName, Rng } from './models';
 
 export interface PresetSpec {
   name: PresetName;
@@ -61,4 +61,62 @@ export function estimate(
     perDay,
     days: perDay === 0 ? Infinity : Math.ceil(targetCount / perDay),
   };
+}
+
+// ── 런타임 페이싱 (ADR-0007): 워밍업·로그노멀 지터·긴 휴식·활동 시간·예산 감시 ──
+
+/** 워밍업: 첫 100건 u=0.3(측정 겸), 다음 200건 동안 프리셋 u까지 선형 상승 */
+export function warmupUtil(preset: PresetSpec, deletedSoFar: number): number {
+  const target = Math.min(preset.utilization, HARD_MAX_UTIL);
+  const start = Math.min(UNOBSERVED_UTIL, target);
+  if (deletedSoFar < 100) return start;
+  if (deletedSoFar < 300) return start + (target - start) * ((deletedSoFar - 100) / 200);
+  return target;
+}
+
+/** 중앙값 1.0의 로그노멀 배수. 오른쪽 꼬리가 긴 사람형 분포 */
+export function lognormalMultiplier(rng: Rng, sigma = 0.35): number {
+  const u1 = Math.max(rng(), 1e-9);
+  const u2 = rng();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return Math.exp(sigma * z);
+}
+
+/** 다음 삭제까지 대기(ms). 워밍업 u + 로그노멀 지터 + 4% 확률 2~8분 긴 휴식 */
+export function nextDelayMs(
+  preset: PresetSpec,
+  budget: RateBudget,
+  deletedSoFar: number,
+  rng: Rng = Math.random,
+): number {
+  const u = Math.min(warmupUtil(preset, deletedSoFar), HARD_MAX_UTIL);
+  const base = Math.max(
+    preset.floorMs,
+    HARD_MIN_DELAY_MS,
+    (budget.windowSec * 1000) / (u * budget.limit),
+  );
+  let ms = base * lognormalMultiplier(rng);
+  if (rng() < 0.04) ms += (120 + rng() * 360) * 1000;
+  return Math.max(HARD_MIN_DELAY_MS, Math.round(ms));
+}
+
+/** 잔여 예산이 (1−u)·L 아래면 창 리셋까지 기다린다(429 선제 회피, SRS §6) */
+export function shouldWaitForReset(remaining: number, limit: number, utilization: number): boolean {
+  return remaining < (1 - Math.min(utilization, HARD_MAX_UTIL)) * limit;
+}
+
+/** 로컬 시각이 활동 시간대 안인가. start<end 가정(예: 9~23) */
+export function withinActiveHours(date: Date, startHour: number, endHour: number): boolean {
+  const h = date.getHours() + date.getMinutes() / 60;
+  return h >= startHour && h < endHour;
+}
+
+/** 활동 시간대 밖이면 다음 시작 시각(ms epoch), 안이면 null */
+export function nextActiveStart(date: Date, startHour: number, endHour: number): number | null {
+  if (withinActiveHours(date, startHour, endHour)) return null;
+  const next = new Date(date);
+  const h = date.getHours() + date.getMinutes() / 60;
+  if (h >= endHour) next.setDate(next.getDate() + 1);
+  next.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+  return next.getTime();
 }
