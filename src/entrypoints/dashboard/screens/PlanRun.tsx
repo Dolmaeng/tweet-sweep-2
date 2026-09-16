@@ -8,13 +8,14 @@ import { fmtDays, fmtInt } from '../lib/format';
 
 interface Props {
   account: AccountRecord;
+  defaultPreset?: PresetName;
   onPlanned: (job: Job) => void;
   onBack: () => void;
 }
 
 const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
 
-export function PlanRun({ account, onPlanned, onBack }: Props) {
+export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }: Props) {
   const [posts, setPosts] = useState<
     | {
         id: string;
@@ -33,7 +34,7 @@ export function PlanRun({ account, onPlanned, onBack }: Props) {
   const [keyword, setKeyword] = useState('');
   const [keepMinLikes, setKeepMinLikes] = useState('');
   const [keepIds, setKeepIds] = useState('');
-  const [preset, setPreset] = useState<PresetName>('brisk');
+  const [preset, setPreset] = useState<PresetName>(defaultPreset);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {

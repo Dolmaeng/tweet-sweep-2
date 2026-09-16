@@ -4,11 +4,12 @@ import { fmtDate, fmtInt } from '../lib/format';
 interface Props {
   accounts: AccountRecord[];
   onImport: () => void;
+  onSettings: () => void;
   onOpen: (account: AccountRecord) => void;
   onDelete: (account: AccountRecord) => void;
 }
 
-export function Home({ accounts, onImport, onOpen, onDelete }: Props) {
+export function Home({ accounts, onImport, onSettings, onOpen, onDelete }: Props) {
   return (
     <section className="card">
       <h2>계정</h2>
@@ -61,6 +62,9 @@ export function Home({ accounts, onImport, onOpen, onDelete }: Props) {
       )}
       <div className="actions">
         <button onClick={onImport}>아카이브 가져오기</button>
+        <button className="secondary" onClick={onSettings}>
+          설정
+        </button>
       </div>
     </section>
   );

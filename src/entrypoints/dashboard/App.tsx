@@ -7,7 +7,15 @@ import {
   type AccountRecord,
 } from '../../platform/db';
 import type { ImportResult } from '../../platform/import';
-import { SETTING_CONSENT_AT, getSetting, setSetting } from '../../platform/settings';
+import {
+  SETTING_CONSENT_AT,
+  getSetting,
+  loadRunSettings,
+  saveRunSettings,
+  setSetting,
+} from '../../platform/settings';
+import { DEFAULT_RUN_SETTINGS, type RunSettings } from '../../core/settings';
+import { Settings } from './screens/Settings';
 import { Analyze } from './screens/Analyze';
 import { Consent } from './screens/Consent';
 import { Home } from './screens/Home';
@@ -21,6 +29,7 @@ type Screen =
   | { name: 'consent' }
   | { name: 'home' }
   | { name: 'import' }
+  | { name: 'settings' }
   | { name: 'analyze'; account: AccountRecord }
   | { name: 'testrun'; account: AccountRecord }
   | { name: 'plan'; account: AccountRecord }
@@ -29,6 +38,7 @@ type Screen =
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'loading' });
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [runSettings, setRunSettings] = useState<RunSettings>(DEFAULT_RUN_SETTINGS);
 
   const refresh = useCallback(async () => {
     setAccounts(await listAccounts());
@@ -37,6 +47,7 @@ export function App() {
   useEffect(() => {
     void (async () => {
       const consent = await getSetting<string>(SETTING_CONSENT_AT);
+      setRunSettings(await loadRunSettings());
       await refresh();
       setScreen(consent ? { name: 'home' } : { name: 'consent' });
     })();
@@ -57,6 +68,11 @@ export function App() {
     await refresh();
   }
 
+  async function saveSettings(next: RunSettings) {
+    await saveRunSettings(next);
+    setRunSettings(next);
+  }
+
   async function goRun(account: AccountRecord) {
     const job = await getResumableJob(account.userId);
     setScreen(job ? { name: 'live', account, job } : { name: 'plan', account });
@@ -66,7 +82,7 @@ export function App() {
     <main className="page">
       <header className="top">
         <h1>tweet-sweep-2</h1>
-        <span className="muted small">로컬 전용 · M1 가져오기·분석</span>
+        <span className="muted small">로컬 전용</span>
       </header>
       {screen.name === 'loading' && <p className="muted">불러오는 중…</p>}
       {screen.name === 'consent' && <Consent onAccept={() => void accept()} />}
@@ -74,8 +90,16 @@ export function App() {
         <Home
           accounts={accounts}
           onImport={() => setScreen({ name: 'import' })}
+          onSettings={() => setScreen({ name: 'settings' })}
           onOpen={(account) => setScreen({ name: 'analyze', account })}
           onDelete={(account) => void remove(account)}
+        />
+      )}
+      {screen.name === 'settings' && (
+        <Settings
+          value={runSettings}
+          onSave={(next) => void saveSettings(next)}
+          onBack={() => setScreen({ name: 'home' })}
         />
       )}
       {screen.name === 'import' && (
@@ -96,6 +120,7 @@ export function App() {
       {screen.name === 'plan' && (
         <PlanRun
           account={screen.account}
+          defaultPreset={runSettings.preset}
           onPlanned={(job) => setScreen({ name: 'live', account: screen.account, job })}
           onBack={() => setScreen({ name: 'home' })}
         />
@@ -104,6 +129,7 @@ export function App() {
         <LiveRun
           account={screen.account}
           job={screen.job}
+          settings={runSettings}
           onBack={() => setScreen({ name: 'home' })}
         />
       )}
