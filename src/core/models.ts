@@ -89,3 +89,8 @@ export interface AuditEvent {
   durationMs: number;
   detail?: string;
 }
+
+/** 주입 가능한 난수원 [0,1). 테스트에서 결정적으로 만들 수 있다 */
+export interface Rng {
+  (): number;
+}
