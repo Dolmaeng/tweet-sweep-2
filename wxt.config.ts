@@ -8,7 +8,7 @@ export default defineConfig({
   manifest: {
     name: 'tweet-sweep-2',
     description: '로그인 세션 안에서 내 X 게시물을 사람보다 느리게 삭제한다. 로컬 전용.',
-    permissions: ['storage', 'tabs', 'scripting', 'unlimitedStorage'],
+    permissions: ['storage', 'tabs', 'scripting', 'unlimitedStorage', 'webRequest'],
     host_permissions: ['https://x.com/*'],
     action: {}, // 아이콘 클릭 → 대시보드 탭 (background에서 처리)
   },
