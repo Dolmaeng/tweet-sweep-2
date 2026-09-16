@@ -7,12 +7,13 @@ interface Props {
   importedAt: string;
   onBack: () => void;
   onTestRun: () => void;
+  onRun: () => void;
 }
 
 const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
 
 /** analyze 보고서 (FR-05). v1 대상 = 원글 + 답글 (RT 제외, SRS §2) */
-export function Analyze({ summary, importedAt, onBack, onTestRun }: Props) {
+export function Analyze({ summary, importedAt, onBack, onTestRun, onRun }: Props) {
   const target = summary.byKind.post + summary.byKind.reply;
   const years = Object.keys(summary.byYear).sort();
 
@@ -139,7 +140,12 @@ export function Analyze({ summary, importedAt, onBack, onTestRun }: Props) {
           계정 목록
         </button>
         <button onClick={exportCsv}>CSV 내보내기</button>
-        <button onClick={onTestRun}>삭제 테스트 (M2)</button>
+        <button className="secondary" onClick={onTestRun}>
+          삭제 테스트
+        </button>
+        <button className="danger" onClick={onRun}>
+          삭제 실행
+        </button>
       </div>
     </section>
   );

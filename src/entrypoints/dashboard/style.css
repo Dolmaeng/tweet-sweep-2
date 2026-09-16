@@ -112,3 +112,79 @@ button:disabled {
 code {
   font-size: 13px;
 }
+
+/* 실행 화면 */
+.counter {
+  font-size: 20px;
+  margin: 8px 0 6px;
+}
+.counter b {
+  color: var(--accent);
+}
+.bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+.feed {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  max-height: 360px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+.feed li {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.feed li.ok {
+  color: var(--muted);
+}
+.feed li.bad {
+  color: var(--danger);
+}
+.mono {
+  font-family: ui-monospace, monospace;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+.grid2 label,
+label.block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+label.block {
+  margin: 8px 0;
+}
+.grid2 input,
+label.block input,
+select {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: inherit;
+}
+.target {
+  margin-top: 12px;
+  font-size: 15px;
+}
+@media (max-width: 560px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}

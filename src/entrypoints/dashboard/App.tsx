@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { deleteAccountData, listAccounts, type AccountRecord } from '../../platform/db';
+import type { Job } from '../../core/models';
+import {
+  deleteAccountData,
+  getResumableJob,
+  listAccounts,
+  type AccountRecord,
+} from '../../platform/db';
 import type { ImportResult } from '../../platform/import';
 import { SETTING_CONSENT_AT, getSetting, setSetting } from '../../platform/settings';
 import { Analyze } from './screens/Analyze';
 import { Consent } from './screens/Consent';
 import { Home } from './screens/Home';
 import { Import } from './screens/Import';
+import { LiveRun } from './screens/LiveRun';
+import { PlanRun } from './screens/PlanRun';
 import { TestRun } from './screens/TestRun';
 
 type Screen =
@@ -14,7 +22,9 @@ type Screen =
   | { name: 'home' }
   | { name: 'import' }
   | { name: 'analyze'; account: AccountRecord }
-  | { name: 'testrun'; account: AccountRecord };
+  | { name: 'testrun'; account: AccountRecord }
+  | { name: 'plan'; account: AccountRecord }
+  | { name: 'live'; account: AccountRecord; job: Job };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'loading' });
@@ -47,6 +57,11 @@ export function App() {
     await refresh();
   }
 
+  async function goRun(account: AccountRecord) {
+    const job = await getResumableJob(account.userId);
+    setScreen(job ? { name: 'live', account, job } : { name: 'plan', account });
+  }
+
   return (
     <main className="page">
       <header className="top">
@@ -72,10 +87,25 @@ export function App() {
           importedAt={screen.account.importedAt}
           onBack={() => setScreen({ name: 'home' })}
           onTestRun={() => setScreen({ name: 'testrun', account: screen.account })}
+          onRun={() => void goRun(screen.account)}
         />
       )}
       {screen.name === 'testrun' && (
         <TestRun account={screen.account} onBack={() => setScreen({ name: 'home' })} />
+      )}
+      {screen.name === 'plan' && (
+        <PlanRun
+          account={screen.account}
+          onPlanned={(job) => setScreen({ name: 'live', account: screen.account, job })}
+          onBack={() => setScreen({ name: 'home' })}
+        />
+      )}
+      {screen.name === 'live' && (
+        <LiveRun
+          account={screen.account}
+          job={screen.job}
+          onBack={() => setScreen({ name: 'home' })}
+        />
       )}
     </main>
   );
