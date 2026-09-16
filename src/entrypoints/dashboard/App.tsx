@@ -6,13 +6,15 @@ import { Analyze } from './screens/Analyze';
 import { Consent } from './screens/Consent';
 import { Home } from './screens/Home';
 import { Import } from './screens/Import';
+import { TestRun } from './screens/TestRun';
 
 type Screen =
   | { name: 'loading' }
   | { name: 'consent' }
   | { name: 'home' }
   | { name: 'import' }
-  | { name: 'analyze'; account: AccountRecord };
+  | { name: 'analyze'; account: AccountRecord }
+  | { name: 'testrun'; account: AccountRecord };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'loading' });
@@ -69,7 +71,11 @@ export function App() {
           summary={screen.account.summary}
           importedAt={screen.account.importedAt}
           onBack={() => setScreen({ name: 'home' })}
+          onTestRun={() => setScreen({ name: 'testrun', account: screen.account })}
         />
+      )}
+      {screen.name === 'testrun' && (
+        <TestRun account={screen.account} onBack={() => setScreen({ name: 'home' })} />
       )}
     </main>
   );
