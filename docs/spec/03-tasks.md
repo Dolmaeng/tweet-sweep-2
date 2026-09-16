@@ -31,7 +31,8 @@
 - [x] T23 scheduler + `platform/runner.ts` run 루프(일시정지·중지·재개, 강제 종료 후 pending 재개 중복 0) + jobs persistence 테스트 — 커밋들 참조
 - [x] T24 계획 화면 `PlanRun`(필터 UI·실시간 대상 수·프리셋·예상 소요) → job 생성
 - [x] T25 실행 화면 `LiveRun`: 삭제마다 실시간 1행 + `deleted N of M tweets` 카운터 + 진행바 + X 예산 표시(FR-11a). 감사 로그 IndexedDB 기록. [ ] JSONL/CSV 내보내기는 후속
-- [ ] T26 설정 화면(프리셋·시간대·실행기·라벨·셀렉터) + 하드 상한 거부 — AC: 초과값 저장 불가
+- [x] T26 설정 화면(프리셋·활동 시간대·간격 하한) + 하드 상한 거부(10s 미만 저장 불가 테스트) — 10620ab. 실행기·라벨·셀렉터 설정은 후속
+- [x] T26a 실행 화면 대기 사유·재개 시각 강조, 페이싱 간격을 cadence(시작 시각 간격)로 — d5d0475
 - [ ] T27 시나리오 테스트(429 쿨다운·2회 하향·로그인 리다이렉트·연속 실패) — AC: 전부 통과
 - [ ] T28 릴리스 `npm run zip` → GitHub Release v0.1.0 — AC: 다른 PC zip 로드
 - [ ] T29 운영 문서 `docs/ops.md`(첫 주 절차, 잠금 대응) — AC: 사용자 검토
