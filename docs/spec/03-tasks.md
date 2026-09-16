@@ -28,9 +28,9 @@
 - [x] T20 `core/filters.ts` 6조건(유형·기간·키워드·정규식·보존id·지표임계) 조합 + 테스트
 - [x] T21 `core/pacing.ts` 런타임(워밍업 u·로그노멀 지터·4% 긴 휴식·활동시간·예산 감시·하드 최소 10s) + 테스트
 - [x] T22 `core/breaker.ts` 순수 reducer(429 cooling→halted_hours→halted, 잠금·연속오류 즉시 halted) + 전이 테스트
-- [x] T23a `core/scheduler.ts` 결정 함수(halt·cooling·활동시간·예산·일시정지·done→delete) + 테스트. [ ] T23b 대시보드 run 루프·persistence는 다음
-- [ ] T24 plan 화면(필터 UI·목록·CSV) — AC: dry-run 기본
-- [ ] T25 감사 로그·내보내기(JSONL/CSV) + 실시간 피드(삭제마다 1행 즉시) + 카운터 `deleted N of M tweets`·잔여 예상·다음 실행 시각 — AC: 항목별 1행, 카운터가 결과 수신 즉시 갱신(FR-11a)
+- [x] T23 scheduler + `platform/runner.ts` run 루프(일시정지·중지·재개, 강제 종료 후 pending 재개 중복 0) + jobs persistence 테스트 — 커밋들 참조
+- [x] T24 계획 화면 `PlanRun`(필터 UI·실시간 대상 수·프리셋·예상 소요) → job 생성
+- [x] T25 실행 화면 `LiveRun`: 삭제마다 실시간 1행 + `deleted N of M tweets` 카운터 + 진행바 + X 예산 표시(FR-11a). 감사 로그 IndexedDB 기록. [ ] JSONL/CSV 내보내기는 후속
 - [ ] T26 설정 화면(프리셋·시간대·실행기·라벨·셀렉터) + 하드 상한 거부 — AC: 초과값 저장 불가
 - [ ] T27 시나리오 테스트(429 쿨다운·2회 하향·로그인 리다이렉트·연속 실패) — AC: 전부 통과
 - [ ] T28 릴리스 `npm run zip` → GitHub Release v0.1.0 — AC: 다른 PC zip 로드
