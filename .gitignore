@@ -1,10 +1,3 @@
-# Node / 빌드
-node_modules/
-.output/
-.wxt/
-dist/
-coverage/
-*.tsbuildinfo
 
 # 개인 데이터 — 커밋 금지
 data/
@@ -21,3 +14,12 @@ Thumbs.db
 .DS_Store
 .vscode/
 .idea/
+
+# WXT / Node
+node_modules/
+.output/
+.wxt/
+stats.html
+stats-*.json
+web-ext.config.ts
+*.log

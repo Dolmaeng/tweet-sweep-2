@@ -1,0 +1,45 @@
+{
+  "name": "tweet-sweep-2",
+  "description": "로그인 세션 안에서 내 X 게시물을 사람보다 느리게 삭제하는 개인용 Chrome 확장",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "wxt",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run compile && npm run lint && npm run format:check && npm run test",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "idb": "^8.0.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@wxt-dev/module-react": "^1.1.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "happy-dom": "^20.14.5",
+    "prettier": "^3.9.7",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^4.1.11",
+    "wxt": "^0.21.4"
+  }
+}
