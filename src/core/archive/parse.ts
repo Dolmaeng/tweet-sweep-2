@@ -65,7 +65,8 @@ function parseJsonArray(text: string, label: string): unknown[] {
   } catch (e) {
     throw new ArchiveFormatError(`${label} 파일 JSON 파싱 실패: ${(e as Error).message}`);
   }
-  if (!Array.isArray(value)) throw new ArchiveFormatError(`${label} 파일 최상위가 배열이 아닙니다.`);
+  if (!Array.isArray(value))
+    throw new ArchiveFormatError(`${label} 파일 최상위가 배열이 아닙니다.`);
   return value;
 }
 
@@ -145,7 +146,18 @@ function extractMedia(t: RawTweet): string[] {
 }
 
 const MONTHS: Record<string, number> = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
 };
 
 /** "Wed Oct 10 20:19:24 +0000 2018" → "2018-10-10T20:19:24.000Z". 엔진 의존 없는 직접 파싱 */
