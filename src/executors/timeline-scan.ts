@@ -43,6 +43,67 @@ function socialContextOf(article: Element): string {
   return (article.querySelector('[data-testid="socialContext"]')?.textContent ?? '').trim();
 }
 
+/** 상태가 바뀌는 액션 버튼. 누른 뒤의 testid가 있으면 내가 그 액션을 한 글이다 */
+const ACTED = {
+  liked: 'unlike',
+  retweeted: 'unretweet',
+  bookmarked: 'removeBookmark',
+} as const;
+
+/** 지표별 버튼 두 상태. 어느 쪽이든 숫자가 붙어 있으면 그 수치가 1 이상이다 */
+const COUNTED = {
+  hasLikes: ['like', 'unlike'],
+  hasRetweets: ['retweet', 'unretweet'],
+  hasBookmarks: ['bookmark', 'removeBookmark'],
+} as const;
+
+const MEDIA_SEL =
+  '[data-testid="tweetPhoto"], [data-testid="videoPlayer"], [data-testid="videoComponent"]';
+
+/** 인용한 글은 카드 안에 role="link" 블록으로 들어간다. 그 안의 미디어는 내가 올린 것이 아니다 */
+const QUOTE_SEL = '[role="link"]';
+
+/** 본문과 액션 바를 뺀 카드 텍스트. 답글 안내·사회적 맥락만 남는다 */
+const CHROME_STRIP = '[data-testid="tweetText"], [role="group"]';
+
+/** "…에게 보내는 답글 | Replying to". 액션 바의 "답글" 버튼과 섞이지 않게 먼저 떼어낸다 */
+const REPLY_LABEL_RE = /답글|replying to/i;
+
+function chromeText(article: Element): string {
+  const clone = article.cloneNode(true) as Element;
+  for (const el of clone.querySelectorAll(CHROME_STRIP)) el.remove();
+  return clone.textContent ?? '';
+}
+
+export function isReplyCard(article: Element): boolean {
+  return REPLY_LABEL_RE.test(chromeText(article));
+}
+
+/**
+ * 버튼에 숫자가 붙어 있으면 수치가 1 이상. 0이면 X는 숫자를 아예 그리지 않는다.
+ * aria-label("좋아요 12개")을 먼저 보므로 표기가 축약("1.2천")돼도 판정이 흔들리지 않는다.
+ */
+function hasCount(article: Element, names: readonly string[]): boolean {
+  return names.some((name) => {
+    const btn = article.querySelector(`[data-testid="${name}"]`);
+    if (!btn) return false;
+    return /\d/.test(btn.getAttribute('aria-label') ?? '') || /\d/.test(btn.textContent ?? '');
+  });
+}
+
+function inQuote(article: Element, node: Element): boolean {
+  const quote = node.closest(QUOTE_SEL);
+  return quote !== null && quote !== article && article.contains(quote);
+}
+
+function mediaOf(article: Element): { ownMedia: boolean; hasMedia: boolean } {
+  const nodes = Array.from(article.querySelectorAll(MEDIA_SEL));
+  return {
+    ownMedia: nodes.some((n) => !inQuote(article, n)),
+    hasMedia: nodes.length > 0,
+  };
+}
+
 /** "고정됨 | Pinned" 같은 사회적 맥락 라벨 */
 export function isPinnedCard(article: Element): boolean {
   return /고정|pinned/i.test(socialContextOf(article));
@@ -74,6 +135,14 @@ export function scanTimeline(doc: Document): TimelineItem[] {
       repost: isRepostCard(article),
       text: textOf(article),
       createdAt: createdAtOf(article),
+      reply: isReplyCard(article),
+      liked: article.querySelector(`[data-testid="${ACTED.liked}"]`) !== null,
+      retweeted: article.querySelector(`[data-testid="${ACTED.retweeted}"]`) !== null,
+      bookmarked: article.querySelector(`[data-testid="${ACTED.bookmarked}"]`) !== null,
+      hasLikes: hasCount(article, COUNTED.hasLikes),
+      hasRetweets: hasCount(article, COUNTED.hasRetweets),
+      hasBookmarks: hasCount(article, COUNTED.hasBookmarks),
+      ...mediaOf(article),
     });
   }
   return items;

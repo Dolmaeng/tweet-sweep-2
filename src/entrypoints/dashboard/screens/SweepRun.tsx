@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExecutionResult, Job } from '../../../core/models';
 import type { RunSettings } from '../../../core/settings';
+import { isFilterActive, NO_SWEEP_FILTER, type SweepFilter } from '../../../core/sweep-filter';
 import { createSweepJob, getResumableJob } from '../../../platform/db';
+import { loadSweepFilter, saveSweepFilter } from '../../../platform/settings';
 import { runSweep, type SweepEvent } from '../../../platform/sweep';
 import type { RunControls } from '../../../platform/runner';
+import { FilterPanel } from '../components/FilterPanel';
 import {
   ensureWorker,
   navigate,
@@ -51,11 +54,11 @@ async function loadSession(): Promise<{ who: string; prior: Job | undefined }> {
   return { who, prior: await getResumableJob(who.toLowerCase(), 'sweep') };
 }
 
-function makeSweepJob(userId: string, settings: RunSettings): Job {
+function makeSweepJob(userId: string, settings: RunSettings, filter: SweepFilter): Job {
   return {
     id: `sweep-${Date.now()}`,
     userId,
-    filterSpec: { all: true },
+    filterSpec: filter,
     preset: settings.preset,
     order: 'newest',
     mode: 'sweep',
@@ -74,6 +77,7 @@ export function SweepRun({ settings, onBack }: Props) {
   const [checkNonce, setCheckNonce] = useState(0);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [filter, setFilter] = useState<SweepFilter>(NO_SWEEP_FILTER);
   const [running, setRunning] = useState(false);
   const [deleted, setDeleted] = useState(0);
   const [feed, setFeed] = useState<FeedLine[]>([]);
@@ -106,14 +110,22 @@ export function SweepRun({ settings, onBack }: Props) {
     };
   }, [checkNonce]);
 
+  useEffect(() => {
+    void loadSweepFilter().then(setFilter);
+  }, []);
+
+  function changeFilter(next: SweepFilter) {
+    setFilter(next);
+    void saveSweepFilter(next);
+  }
+
   async function start() {
     if (running || !username) return;
     const userId = username.toLowerCase();
-    let job = await getResumableJob(userId, 'sweep');
-    if (!job) {
-      job = makeSweepJob(userId, settings);
-      await createSweepJob(job);
-    }
+    const prior = await getResumableJob(userId, 'sweep');
+    // 이어서 할 때도 지금 화면의 필터를 쓴다. 작업 기록도 그 값으로 맞춘다
+    const job = prior ? { ...prior, filterSpec: filter } : makeSweepJob(userId, settings, filter);
+    await createSweepJob(job);
     setDeleted(job.removedCount);
     paused.current = false;
     stopped.current = false;
@@ -127,6 +139,7 @@ export function SweepRun({ settings, onBack }: Props) {
       {
         job,
         username,
+        filter,
         activeStartHour: settings.activeStartHour,
         activeEndHour: settings.activeEndHour,
         ...(settings.floorSec !== null ? { floorMs: settings.floorSec * 1000 } : {}),
@@ -181,7 +194,8 @@ export function SweepRun({ settings, onBack }: Props) {
 
       <div className="notice">
         <b>되돌릴 수 없습니다.</b> 이 모드는 목록도 미리보기도 없이, 로그인한 계정의 원글과 답글을
-        최신 글부터 전부 지웁니다. 리포스트는 건드리지 않고, 고정한 글은 맨 마지막에 지웁니다.
+        최신 글부터 {isFilterActive(filter) ? '필터에 걸리지 않는 것만' : '전부'} 지웁니다.
+        리포스트는 건드리지 않고, 고정한 글은 맨 마지막에 지웁니다.
       </div>
 
       {checkError && (
@@ -227,6 +241,8 @@ export function SweepRun({ settings, onBack }: Props) {
             </div>
           )}
 
+          <FilterPanel value={filter} onChange={changeFilter} disabled={running} />
+
           {!running && (
             <label className="block">
               시작하려면 계정 이름 <code>{username}</code> 을 그대로 입력하세요
@@ -243,7 +259,11 @@ export function SweepRun({ settings, onBack }: Props) {
           <div className="actions">
             {!running ? (
               <button onClick={() => void start()} disabled={!confirmed || ended === '완료'}>
-                {deleted > 0 ? '이어서 삭제' : '전부 삭제 시작'}
+                {deleted > 0
+                  ? '이어서 삭제'
+                  : isFilterActive(filter)
+                    ? '삭제 시작'
+                    : '전부 삭제 시작'}
               </button>
             ) : (
               <>

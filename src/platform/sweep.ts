@@ -9,6 +9,7 @@ import {
 import type { ExecutionResult, Job, Signal } from '../core/models';
 import { HARD_MIN_DELAY_MS, PRESETS } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
+import { isExcluded, isFilterActive, type SweepFilter } from '../core/sweep-filter';
 import { nextRecovery, pickSweepTarget } from '../core/timeline';
 import { withRepliesUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
@@ -39,6 +40,8 @@ export interface SweepContext {
   job: Job;
   /** 세션에서 읽은 handle. 사용자 입력이 아니다 */
   username: string;
+  /** 보존 필터(FR-18a). 걸리는 카드는 후보에서 뺀다 */
+  filter: SweepFilter;
   activeStartHour: number;
   activeEndHour: number;
   floorMs?: number;
@@ -63,6 +66,9 @@ export async function runSweep(
   let emptyStreak = 0;
   /** 시도했지만 못 지운 글. 같은 카드를 무한히 다시 집지 않게 한다 */
   const skip = new Set<string>();
+  /** 이번 실행에서 한 번이라도 스캔한 글. 스크롤이 새 카드를 불러왔는지 판정한다 */
+  const seen = new Set<string>();
+  const filtered = isFilterActive(ctx.filter);
 
   await setJobStatus(ctx.job.id, 'running');
   onEvent({ type: 'running' });
@@ -143,10 +149,18 @@ export async function runSweep(
       }
 
       const items = await scanOnTab(w.tabId);
-      const target = pickSweepTarget(items, ctx.username, skip);
+      const fresh = items.some((i) => !seen.has(i.postId));
+      for (const i of items) seen.add(i.postId);
+      const target = pickSweepTarget(
+        items.filter((i) => !isExcluded(i, ctx.filter)),
+        ctx.username,
+        skip,
+      );
 
       if (!target) {
-        emptyStreak += 1;
+        // 처음 보는 카드가 올라왔다면 아직 타임라인을 다 훑지 못한 것이다. 보존한 글이
+        // 위에 쌓이면 후보 없는 화면이 계속 나오므로, 이걸 완료로 읽으면 안 된다.
+        emptyStreak = fresh ? 0 : emptyStreak + 1;
         const recovery = nextRecovery(emptyStreak);
         if (recovery === 'done') {
           await setJobStatus(ctx.job.id, 'completed');
@@ -200,8 +214,10 @@ export async function runSweep(
 
       onEvent({ type: 'item', postId: targetId, result, deleted, at: Date.now() });
 
-      // 아래로 내려가 있었다면 맨 위로 돌아가 최신부터 유지한다
-      if (removed && scrolledAway && worker) {
+      // 아래로 내려가 있었다면 맨 위로 돌아가 최신부터 유지한다.
+      // 필터가 켜져 있으면 보존한 글이 맨 위에 영구히 쌓인다. 돌아가면 그 벽을 매번
+      // 다시 스크롤해야 하므로, 그때는 있던 자리에서 이어간다.
+      if (removed && scrolledAway && !filtered && worker) {
         try {
           await scrollOnTab(worker.tabId, 'top');
           scrolledAway = false;

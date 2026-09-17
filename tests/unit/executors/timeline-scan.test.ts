@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   isPinnedCard,
+  isReplyCard,
   isRepostCard,
   readSessionUsername,
   scanTimeline,
@@ -21,11 +22,19 @@ const CARD = (opts: {
   context?: string;
   text?: string;
   time?: string;
+  /** 본문 앞에 붙는 안내(답글 등) */
+  chrome?: string;
+  /** 액션 바 내용 */
+  actions?: string;
+  media?: string;
 }) => `
   <article data-testid="tweet">
     ${opts.context ? `<span data-testid="socialContext">${opts.context}</span>` : ''}
+    ${opts.chrome ?? ''}
     <a href="/${opts.handle}/status/${opts.id}"><time datetime="${opts.time ?? '2024-12-12T00:00:00.000Z'}"></time></a>
     <div data-testid="tweetText">${opts.text ?? ''}</div>
+    ${opts.media ?? ''}
+    <div role="group">${opts.actions ?? ''}</div>
   </article>
 `;
 
@@ -56,6 +65,15 @@ describe('scanTimeline', () => {
         repost: false,
         text: '안녕',
         createdAt: '2024-12-12T00:00:00.000Z',
+        reply: false,
+        liked: false,
+        hasLikes: false,
+        retweeted: false,
+        hasRetweets: false,
+        bookmarked: false,
+        hasBookmarks: false,
+        ownMedia: false,
+        hasMedia: false,
       },
     ]);
   });
@@ -98,5 +116,90 @@ describe('scanTimeline', () => {
     const article = doc.querySelector('article')!;
     expect(isPinnedCard(article)).toBe(true);
     expect(isRepostCard(article)).toBe(false);
+  });
+});
+
+describe('isReplyCard', () => {
+  it('reads the reply notice that sits outside the body', () => {
+    const doc = setBody(
+      CARD({ handle: 'a', id: '1', chrome: '<div>@someone님에게 보내는 답글</div>' }) +
+        CARD({ handle: 'a', id: '2', chrome: '<div>Replying to @someone</div>' }),
+    );
+    const cards = doc.querySelectorAll('article');
+    expect(isReplyCard(cards[0]!)).toBe(true);
+    expect(isReplyCard(cards[1]!)).toBe(true);
+  });
+
+  it('is not fooled by the reply button or by the word inside the body', () => {
+    const doc = setBody(
+      CARD({
+        handle: 'a',
+        id: '1',
+        text: '답글 좀 달아주세요',
+        actions: '<button data-testid="reply" aria-label="답글 3개. 답글"></button>',
+      }),
+    );
+    expect(isReplyCard(doc.querySelector('article')!)).toBe(false);
+  });
+});
+
+describe('scanTimeline — 필터 신호', () => {
+  it('reads which actions I took from the post-action testids', () => {
+    const doc = setBody(
+      CARD({
+        handle: 'a',
+        id: '1',
+        actions: `
+          <button data-testid="unlike" aria-label="좋아요"></button>
+          <button data-testid="unretweet" aria-label="재게시"></button>
+          <button data-testid="removeBookmark" aria-label="북마크"></button>`,
+      }),
+    );
+    expect(scanTimeline(doc)[0]).toMatchObject({
+      liked: true,
+      retweeted: true,
+      bookmarked: true,
+      // 라벨에 숫자가 없으므로 수치는 0이다
+      hasLikes: false,
+      hasRetweets: false,
+      hasBookmarks: false,
+    });
+  });
+
+  it('treats a number on the action button as a count of 1 or more', () => {
+    const doc = setBody(
+      CARD({
+        handle: 'a',
+        id: '1',
+        actions: `
+          <button data-testid="like" aria-label="좋아요 12개. 좋아요"></button>
+          <button data-testid="retweet" aria-label="재게시"><span>1.2천</span></button>
+          <button data-testid="bookmark" aria-label="북마크"></button>`,
+      }),
+    );
+    expect(scanTimeline(doc)[0]).toMatchObject({
+      liked: false,
+      hasLikes: true,
+      hasRetweets: true,
+      hasBookmarks: false,
+    });
+  });
+
+  it('counts media in a quoted post as media, but not as mine', () => {
+    const doc = setBody(
+      CARD({
+        handle: 'a',
+        id: '1',
+        media: '<div role="link"><div data-testid="tweetPhoto"></div></div>',
+      }) +
+        CARD({
+          handle: 'a',
+          id: '2',
+          media: '<div data-testid="videoPlayer"></div>',
+        }),
+    );
+    const items = scanTimeline(doc);
+    expect(items[0]).toMatchObject({ hasMedia: true, ownMedia: false });
+    expect(items[1]).toMatchObject({ hasMedia: true, ownMedia: true });
   });
 });

@@ -14,6 +14,24 @@ export interface TimelineItem {
   text: string;
   /** time[datetime] 값(ISO). 없으면 null */
   createdAt: string | null;
+  /** 남에게 단 답글 카드("…에게 보내는 답글") */
+  reply: boolean;
+  /** 내가 좋아요를 누른 상태 */
+  liked: boolean;
+  /** 좋아요 수 1 이상 */
+  hasLikes: boolean;
+  /** 내가 재게시한 상태 */
+  retweeted: boolean;
+  /** 재게시 수 1 이상 */
+  hasRetweets: boolean;
+  /** 내가 북마크한 상태 */
+  bookmarked: boolean;
+  /** 북마크 수 1 이상. X가 카드에 수치를 안 붙이면 항상 false */
+  hasBookmarks: boolean;
+  /** 이 글에 직접 붙은 사진·영상 */
+  ownMedia: boolean;
+  /** 인용한 글의 미디어까지 포함 */
+  hasMedia: boolean;
 }
 
 /** handle 비교는 대소문자를 무시한다(X는 표시만 다르게 할 수 있음) */

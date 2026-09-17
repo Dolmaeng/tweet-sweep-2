@@ -16,6 +16,15 @@ function card(p: Partial<TimelineItem> & { postId: string }): TimelineItem {
     repost: false,
     text: '',
     createdAt: null,
+    reply: false,
+    liked: false,
+    hasLikes: false,
+    retweeted: false,
+    hasRetweets: false,
+    bookmarked: false,
+    hasBookmarks: false,
+    ownMedia: false,
+    hasMedia: false,
     ...p,
   };
 }
