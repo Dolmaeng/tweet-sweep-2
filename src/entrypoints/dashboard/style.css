@@ -255,3 +255,29 @@ input.wide {
 .error li {
   margin: 2px 0;
 }
+
+/* 모드가 판정하지 못하는 조건. 숨기지 않고 왜 못 쓰는지 남긴다 */
+.filter .locked {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.filter .lock {
+  margin-right: 6px;
+}
+
+/* 시작 직전 되읽기 */
+.recap {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  background: var(--card);
+}
+.recap.danger {
+  border-left-color: var(--danger);
+}
+.recap-line {
+  margin: 0 0 4px;
+}

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Job } from '../../../core/models';
 import type { RunSettings } from '../../../core/settings';
-import { isFilterActive, NO_SWEEP_FILTER, type SweepFilter } from '../../../core/sweep-filter';
+import { isFilterActive, NO_KEEP_FILTER, type KeepFilter } from '../../../core/keep-filter';
 import { createSweepJob, getResumableJob } from '../../../platform/db';
-import { loadSweepFilter, saveSweepFilter } from '../../../platform/settings';
+import { loadKeepFilter, saveKeepFilter } from '../../../platform/settings';
 import { runSweep, type SweepEvent } from '../../../platform/sweep';
 import type { RunControls } from '../../../platform/runner';
 import { Feed, FEED_CAP, type FeedLine } from '../components/Feed';
-import { FilterPanel } from '../components/FilterPanel';
+import { KeepFilterPanel } from '../components/KeepFilterPanel';
+import { KeepRecap } from '../components/KeepRecap';
 import {
   ensureWorker,
   navigate,
@@ -47,7 +48,7 @@ async function loadSession(): Promise<{ who: string; prior: Job | undefined }> {
   return { who, prior: await getResumableJob(who.toLowerCase(), 'sweep') };
 }
 
-function makeSweepJob(userId: string, settings: RunSettings, filter: SweepFilter): Job {
+function makeSweepJob(userId: string, settings: RunSettings, filter: KeepFilter): Job {
   return {
     id: `sweep-${Date.now()}`,
     userId,
@@ -70,7 +71,7 @@ export function SweepRun({ settings, onBack }: Props) {
   const [checkNonce, setCheckNonce] = useState(0);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
-  const [filter, setFilter] = useState<SweepFilter>(NO_SWEEP_FILTER);
+  const [filter, setFilter] = useState<KeepFilter>(NO_KEEP_FILTER);
   /** 저장해 둔 필터를 실제로 읽어왔는가. 읽기 전/실패는 "필터 없음"과 구별해야 한다 */
   const [filterLoaded, setFilterLoaded] = useState(false);
   const [filterError, setFilterError] = useState<string | null>(null);
@@ -106,10 +107,10 @@ export function SweepRun({ settings, onBack }: Props) {
     };
   }, [checkNonce]);
 
-  // 읽기에 실패하면 조용히 NO_SWEEP_FILTER로 두면 안 된다. 그 상태로 시작하면 사용자가
+  // 읽기에 실패하면 조용히 NO_KEEP_FILTER로 두면 안 된다. 그 상태로 시작하면 사용자가
   // 체크해 둔 보존 조건(미디어 제외 등)이 없는 채로 전부 지워진다 — 되돌릴 수 없는 사고다.
   useEffect(() => {
-    void loadSweepFilter()
+    void loadKeepFilter('sweep')
       .then((f) => {
         setFilter(f);
         setFilterLoaded(true);
@@ -117,12 +118,12 @@ export function SweepRun({ settings, onBack }: Props) {
       .catch((e: Error) => setFilterError(e.message));
   }, []);
 
-  function changeFilter(next: SweepFilter) {
+  function changeFilter(next: KeepFilter) {
     setFilter(next);
     // 사용자가 직접 고른 값이면 저장값을 못 읽었더라도 그 값으로 시작해도 된다
     setFilterLoaded(true);
     setFilterError(null);
-    void saveSweepFilter(next).catch((e: Error) => setFilterError(e.message));
+    void saveKeepFilter('sweep', next).catch((e: Error) => setFilterError(e.message));
   }
 
   async function start() {
@@ -203,7 +204,7 @@ export function SweepRun({ settings, onBack }: Props) {
 
       <div className="notice">
         <b>되돌릴 수 없습니다.</b> 이 모드는 목록도 미리보기도 없이, 로그인한 계정의 원글과 답글을
-        최신 글부터 {isFilterActive(filter) ? '필터에 걸리지 않는 것만' : '전부'} 지웁니다.
+        최신 글부터 {isFilterActive(filter, 'sweep') ? '필터에 걸리지 않는 것만' : '전부'} 지웁니다.
         리포스트는 건드리지 않고, 고정한 글은 맨 마지막에 지웁니다.
       </div>
 
@@ -250,7 +251,7 @@ export function SweepRun({ settings, onBack }: Props) {
             </div>
           )}
 
-          <FilterPanel value={filter} onChange={changeFilter} disabled={running} />
+          <KeepFilterPanel mode="sweep" value={filter} onChange={changeFilter} disabled={running} />
 
           {filterError !== null ? (
             <p className="error">
@@ -259,6 +260,10 @@ export function SweepRun({ settings, onBack }: Props) {
             </p>
           ) : (
             !filterLoaded && <p className="muted small">저장해 둔 필터 불러오는 중…</p>
+          )}
+
+          {!running && filterLoaded && (
+            <KeepRecap mode="sweep" filter={filter} targetCount={null} />
           )}
 
           {!running && (
@@ -282,7 +287,7 @@ export function SweepRun({ settings, onBack }: Props) {
               >
                 {deleted > 0
                   ? '이어서 삭제'
-                  : isFilterActive(filter)
+                  : isFilterActive(filter, 'sweep')
                     ? '삭제 시작'
                     : '전부 삭제 시작'}
               </button>

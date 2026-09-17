@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DeleteOrder, Job, PostKind, PresetName } from '../../../core/models';
+import type { DeleteOrder, Job, PresetName } from '../../../core/models';
 import { ORDER_LABELS } from '../../../core/order';
-import { selectTargets, type FilterSpec } from '../../../core/filters';
+import {
+  NO_KEEP_FILTER,
+  selectTargets,
+  type KeepFilter,
+  type TargetPost,
+} from '../../../core/keep-filter';
 import { PRESETS, PRESET_ORDER, estimate } from '../../../core/pacing';
 import type { AccountRecord } from '../../../platform/db';
 import { createJob, listPosts } from '../../../platform/db';
+import { loadKeepFilter, saveKeepFilter } from '../../../platform/settings';
+import { KeepFilterPanel } from '../components/KeepFilterPanel';
+import { KeepRecap } from '../components/KeepRecap';
 import { fmtDays, fmtInt } from '../lib/format';
 
 interface Props {
@@ -17,25 +25,11 @@ interface Props {
 const DELETE_ORDERS: DeleteOrder[] = ['newest', 'oldest'];
 
 export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }: Props) {
-  const [posts, setPosts] = useState<
-    | {
-        id: string;
-        kind: PostKind;
-        createdAt: string;
-        text: string;
-        likeCount: number;
-        retweetCount: number;
-      }[]
-    | null
-  >(null);
-  const [includePosts, setIncludePosts] = useState(true);
-  const [includeReplies, setIncludeReplies] = useState(true);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [keepMinLikes, setKeepMinLikes] = useState('');
-  const [keepIds, setKeepIds] = useState('');
-  const [keepMedia, setKeepMedia] = useState(false);
+  const [posts, setPosts] = useState<TargetPost[] | null>(null);
+  const [filter, setFilter] = useState<KeepFilter>(NO_KEEP_FILTER);
+  /** 저장해 둔 필터를 실제로 읽어왔는가. 읽기 전/실패는 "필터 없음"과 구별해야 한다 */
+  const [filterLoaded, setFilterLoaded] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [preset, setPreset] = useState<PresetName>(defaultPreset);
   const [order, setOrder] = useState<DeleteOrder>('newest');
   const [creating, setCreating] = useState(false);
@@ -48,6 +42,8 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
           kind: r.kind,
           createdAt: r.createdAt,
           text: r.text,
+          inReplyToId: r.inReplyToId,
+          hasMedia: r.hasMedia,
           likeCount: r.likeCount,
           retweetCount: r.retweetCount,
         })),
@@ -55,36 +51,38 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
     );
   }, [account.userId]);
 
-  const spec: FilterSpec = useMemo(() => {
-    const kinds: PostKind[] = [];
-    if (includePosts) kinds.push('post');
-    if (includeReplies) kinds.push('reply');
-    const s: FilterSpec = { kinds };
-    if (from) s.from = new Date(from).toISOString();
-    if (to) s.to = new Date(to + 'T23:59:59').toISOString();
-    if (keyword.trim()) s.keyword = keyword.trim();
-    const likes = Number(keepMinLikes);
-    if (keepMinLikes && Number.isFinite(likes)) s.keepMinLikes = likes;
-    const ids = keepIds
-      .split(/[\s,]+/)
-      .map((x) => x.replace(/\D/g, ''))
-      .filter(Boolean);
-    if (ids.length) s.keepIds = ids;
-    if (keepMedia) s.keepMedia = true;
-    return s;
-  }, [includePosts, includeReplies, from, to, keyword, keepMinLikes, keepIds, keepMedia]);
+  // 읽기에 실패하면 조용히 NO_KEEP_FILTER로 두면 안 된다. 그 상태로 계획을 만들면 사용자가
+  // 체크해 둔 보존 조건(미디어 제외 등)이 없는 채로 전부 대상이 된다 — 되돌릴 수 없는 사고다.
+  useEffect(() => {
+    void loadKeepFilter('archive')
+      .then((f) => {
+        setFilter(f);
+        setFilterLoaded(true);
+      })
+      .catch((e: Error) => setFilterError(e.message));
+  }, []);
 
-  const targets = useMemo(() => (posts ? selectTargets(posts as never, spec) : []), [posts, spec]);
+  function changeFilter(next: KeepFilter) {
+    setFilter(next);
+    // 사용자가 직접 고른 값이면 저장값을 못 읽었더라도 그 값으로 시작해도 된다
+    setFilterLoaded(true);
+    setFilterError(null);
+    void saveKeepFilter('archive', next).catch((e: Error) => setFilterError(e.message));
+  }
+
+  const targets = useMemo(() => (posts ? selectTargets(posts, filter) : []), [posts, filter]);
   const est = estimate(targets.length, PRESETS[preset]);
 
   async function makePlan() {
+    if (!filterLoaded) return;
     setCreating(true);
     const job: Job = {
       id: `job-${Date.now()}`,
       userId: account.userId,
-      filterSpec: spec,
+      filterSpec: filter,
       preset,
       order,
+      mode: 'archive',
       createdAt: new Date().toISOString(),
       status: 'planned',
       targetCount: targets.length,
@@ -109,76 +107,16 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
         <p className="muted">글 불러오는 중…</p>
       ) : (
         <>
-          <h3>대상 조건</h3>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={includePosts}
-              onChange={(e) => setIncludePosts(e.target.checked)}
-            />
-            원글
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={includeReplies}
-              onChange={(e) => setIncludeReplies(e.target.checked)}
-            />
-            답글
-          </label>
-          <p className="muted small">리포스트는 v1에서 제외됩니다.</p>
+          <KeepFilterPanel mode="archive" value={filter} onChange={changeFilter} />
 
-          <div className="grid2">
-            <label>
-              기간 시작
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label>
-              기간 끝
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </label>
-            <label>
-              키워드 포함
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="선택"
-              />
-            </label>
-            <label>
-              이 좋아요 이상 보존
-              <input
-                type="number"
-                value={keepMinLikes}
-                onChange={(e) => setKeepMinLikes(e.target.value)}
-                placeholder="선택"
-              />
-            </label>
-          </div>
-          <h3>보존(지우지 않을 글)</h3>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={keepMedia}
-              onChange={(e) => setKeepMedia(e.target.checked)}
-            />
-            미디어가 있는 글 제외 (사진·영상·GIF)
-          </label>
-          <p className="muted small">
-            아카이브는 인용한 글의 미디어를 구분하지 못해 &quot;있으면 보존&quot;만 됩니다. 내가
-            올린 것만 남기려면 <b>아카이브 없이 삭제</b>를 쓰세요.
-          </p>
-
-          <label className="block">
-            보존할 글 ID(고정글 등, 쉼표로 구분)
-            <input
-              type="text"
-              value={keepIds}
-              onChange={(e) => setKeepIds(e.target.value)}
-              placeholder="선택"
-            />
-          </label>
+          {filterError !== null ? (
+            <p className="error">
+              저장해 둔 필터를 읽지 못했습니다({filterError}). 위에서 보존 조건을 다시 선택해야
+              계획을 만들 수 있습니다.
+            </p>
+          ) : (
+            !filterLoaded && <p className="muted small">저장해 둔 필터 불러오는 중…</p>
+          )}
 
           <h3>삭제 순서</h3>
           <select
@@ -202,19 +140,23 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
             ))}
           </select>
 
-          <p className="target">
-            삭제 대상 <b>{fmtInt(targets.length)}</b>건 · 예상 {fmtDays(est.days)} (하루 최대{' '}
-            {fmtInt(est.perDay)}건, 실제 한도로 조정됨)
-          </p>
-          <p className="muted small">
-            안전을 위해 첫날은 워밍업으로 50건 정도만 지우고, 이상 없으면 속도가 올라갑니다.
-          </p>
+          {filterLoaded && (
+            <KeepRecap
+              mode="archive"
+              filter={filter}
+              targetCount={targets.length}
+              note={`예상 ${fmtDays(est.days)} (하루 최대 ${fmtInt(est.perDay)}건, 실제 한도로 조정됨). 안전을 위해 첫날은 워밍업으로 50건 정도만 지우고, 이상 없으면 속도가 올라갑니다.`}
+            />
+          )}
 
           <div className="actions">
             <button className="secondary" onClick={onBack} disabled={creating}>
               돌아가기
             </button>
-            <button onClick={() => void makePlan()} disabled={creating || targets.length === 0}>
+            <button
+              onClick={() => void makePlan()}
+              disabled={creating || !filterLoaded || targets.length === 0}
+            >
               계획 만들기 ({fmtInt(targets.length)}건)
             </button>
           </div>

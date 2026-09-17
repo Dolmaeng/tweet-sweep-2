@@ -9,7 +9,7 @@ import {
 import type { ExecutionResult, Job, Signal } from '../core/models';
 import { HARD_MIN_DELAY_MS, PRESETS } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
-import { isExcluded, isFilterActive, type SweepFilter } from '../core/sweep-filter';
+import { isFilterActive, isKeptSweep, type KeepFilter } from '../core/keep-filter';
 import { nextRecovery, pickSweepTarget } from '../core/timeline';
 import { withRepliesUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
@@ -49,7 +49,7 @@ export interface SweepContext {
   /** 세션에서 읽은 handle. 사용자 입력이 아니다 */
   username: string;
   /** 보존 필터(FR-18a). 걸리는 카드는 후보에서 뺀다 */
-  filter: SweepFilter;
+  filter: KeepFilter;
   activeStartHour: number;
   activeEndHour: number;
   floorMs?: number;
@@ -76,7 +76,7 @@ export async function runSweep(
   const skip = new Set<string>();
   /** 이번 실행에서 한 번이라도 스캔한 글. 스크롤이 새 카드를 불러왔는지 판정한다 */
   const seen = new Set<string>();
-  const filtered = isFilterActive(ctx.filter);
+  const filtered = isFilterActive(ctx.filter, 'sweep');
 
   await setJobStatus(ctx.job.id, 'running');
   onEvent({ type: 'running' });
@@ -161,7 +161,7 @@ export async function runSweep(
       const fresh = items.some((i) => !seen.has(i.postId));
       for (const i of items) seen.add(i.postId);
       const target = pickSweepTarget(
-        items.filter((i) => !isExcluded(i, ctx.filter)),
+        items.filter((i) => !isKeptSweep(i, ctx.filter)),
         ctx.username,
         skip,
       );
