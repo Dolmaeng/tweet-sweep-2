@@ -26,7 +26,7 @@
 
 ## M3 v1
 - [x] T20 `core/filters.ts` 6조건(유형·기간·키워드·정규식·보존id·지표임계) 조합 + 테스트
-- [x] T21 `core/pacing.ts` 런타임(워밍업 u·로그노멀 지터·4% 긴 휴식·활동시간·예산 감시·하드 최소 10s) + 테스트
+- [x] T21 `core/pacing.ts` 런타임(워밍업 u·로그노멀 지터·4% 짧은 휴식(20~40s)·활동시간·예산 감시·하드 최소 5s(ADR-0008)) + 테스트
 - [x] T22 `core/breaker.ts` 순수 reducer(429 cooling→halted_hours→halted, 잠금·연속오류 즉시 halted) + 전이 테스트
 - [x] T23 scheduler + `platform/runner.ts` run 루프(일시정지·중지·재개, 강제 종료 후 pending 재개 중복 0) + jobs persistence 테스트 — 커밋들 참조
 - [x] T24 계획 화면 `PlanRun`(필터 UI·실시간 대상 수·프리셋·예상 소요) → job 생성

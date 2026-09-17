@@ -59,7 +59,7 @@ tweet-sweep-2/
 6. 단계별 타임아웃, 스크린샷 없음(개인정보). 실패 시 단계 이름을 `detail`에 기록
 
 ## 5. 안전 엔진 (ADR-0007 적응형)
-- `pacing.ts`: 입력 = 프리셋(u, 플로어) + 관측 예산(L, W, R, reset) + 워밍업 진행도. `nextDelayMs()` = max(플로어, W÷(u·L)) × 로그노멀(σ 0.35) + 4% 확률 2~8분 휴식. R < (1−u)·L 이면 reset까지 대기. 세션 60~120분마다 10~30분 휴식. 활동 시간대 경계 ±45분 일별 무작위
+- `pacing.ts`: 입력 = 프리셋(u, 플로어) + 관측 예산(L, W, R, reset) + 워밍업 진행도. `nextDelayMs()` = max(플로어, W÷(u·L)) × 로그노멀(σ 0.35) + 4% 확률 20~40초 휴식. R < (1−u)·L 이면 reset까지 대기. 세션 60~120분마다 10~30분 휴식. 활동 시간대 경계 ±45분 일별 무작위
 - 예산 관측: `background.ts`의 webRequest `onCompleted`(`/i/api/graphql/*DeleteTweet*`)에서 `x-rate-limit-limit/-remaining/-reset` 파싱 → 대시보드에 `BUDGET` 메시지. 미관측 시 L=50·W=900·u=0.3 고정
 - 하드 제약 상수: `HARD_MIN_DELAY_MS=5000` · `HARD_MAX_UTIL=0.7` · `HARD_MAX_PER_DAY=8000`(ADR-0008) · 동시 1. 설정 로드 시 위반값 거부
 - `breaker.ts`: CLOSED →(429·차단 문구)→ COOLING(reset+5~15분, u−0.1) → 같은 날 2회 HALTED_HOURS(2~4h, u−0.1) → 3회 HALTED_TODAY · auth_redirect/lock → HALTED(사람 확인) · 연속 오류 3 → HALTED
