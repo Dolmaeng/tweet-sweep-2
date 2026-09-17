@@ -16,6 +16,7 @@ import {
 } from '../../platform/settings';
 import { DEFAULT_RUN_SETTINGS, type RunSettings } from '../../core/settings';
 import { Settings } from './screens/Settings';
+import { SweepRun } from './screens/SweepRun';
 import { Analyze } from './screens/Analyze';
 import { Consent } from './screens/Consent';
 import { Home } from './screens/Home';
@@ -30,6 +31,7 @@ type Screen =
   | { name: 'home' }
   | { name: 'import' }
   | { name: 'settings' }
+  | { name: 'sweep' }
   | { name: 'analyze'; account: AccountRecord }
   | { name: 'testrun'; account: AccountRecord }
   | { name: 'plan'; account: AccountRecord }
@@ -91,9 +93,13 @@ export function App() {
           accounts={accounts}
           onImport={() => setScreen({ name: 'import' })}
           onSettings={() => setScreen({ name: 'settings' })}
+          onSweep={() => setScreen({ name: 'sweep' })}
           onOpen={(account) => setScreen({ name: 'analyze', account })}
           onDelete={(account) => void remove(account)}
         />
+      )}
+      {screen.name === 'sweep' && (
+        <SweepRun settings={runSettings} onBack={() => setScreen({ name: 'home' })} />
       )}
       {screen.name === 'settings' && (
         <Settings

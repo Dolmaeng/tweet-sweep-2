@@ -5,14 +5,19 @@ interface Props {
   accounts: AccountRecord[];
   onImport: () => void;
   onSettings: () => void;
+  onSweep: () => void;
   onOpen: (account: AccountRecord) => void;
   onDelete: (account: AccountRecord) => void;
 }
 
-export function Home({ accounts, onImport, onSettings, onOpen, onDelete }: Props) {
+export function Home({ accounts, onImport, onSettings, onSweep, onOpen, onDelete }: Props) {
   return (
     <section className="card">
       <h2>계정</h2>
+      <p className="muted small">
+        아카이브 zip이 없으면 <b>아카이브 없이 삭제</b>로 로그인한 계정의 글을 최신부터 전부 지울 수
+        있습니다. 목록·필터·미리보기는 없습니다.
+      </p>
       {accounts.length === 0 ? (
         <p className="muted">가져온 아카이브가 없습니다. 먼저 아카이브를 가져오세요.</p>
       ) : (
@@ -62,6 +67,9 @@ export function Home({ accounts, onImport, onSettings, onOpen, onDelete }: Props
       )}
       <div className="actions">
         <button onClick={onImport}>아카이브 가져오기</button>
+        <button className="secondary" onClick={onSweep}>
+          아카이브 없이 삭제
+        </button>
         <button className="secondary" onClick={onSettings}>
           설정
         </button>
