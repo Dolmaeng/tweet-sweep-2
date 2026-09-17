@@ -82,7 +82,7 @@ export function lognormalMultiplier(rng: Rng, sigma = 0.35): number {
   return Math.exp(sigma * z);
 }
 
-/** 다음 삭제까지 대기(ms). 워밍업 u + 로그노멀 지터 + 4% 확률 2~8분 긴 휴식 */
+/** 다음 삭제까지 대기(ms). 워밍업 u + 로그노멀 지터 + 4% 확률 20~40초 짧은 휴식(사용자 조정, 원래 2~8분) */
 export function nextDelayMs(
   preset: PresetSpec,
   budget: RateBudget,
@@ -96,7 +96,7 @@ export function nextDelayMs(
     (budget.windowSec * 1000) / (u * budget.limit),
   );
   let ms = base * lognormalMultiplier(rng);
-  if (rng() < 0.04) ms += (120 + rng() * 360) * 1000;
+  if (rng() < 0.04) ms += (20 + rng() * 20) * 1000;
   return Math.max(HARD_MIN_DELAY_MS, Math.round(ms));
 }
 

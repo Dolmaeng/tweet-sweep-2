@@ -41,13 +41,16 @@ describe('nextDelayMs', () => {
       expect(nextDelayMs(fast, big, 500, () => r)).toBeGreaterThanOrEqual(HARD_MIN_DELAY_MS);
     }
   });
-  it('adds a long rest when the 4% draw hits', () => {
+  it('adds a 20~40s rest when the 4% draw hits', () => {
     // rng sequence: u1, u2 for lognormal, then the 0.04 gate, then rest magnitude
     const seq = [0.5, 0.5, 0.01, 0.5];
     let i = 0;
     const rng = () => seq[i++ % seq.length]!;
+    const base = nextDelayMs(PRESETS.brisk, DEFAULT_BUDGET, 500, () => [0.5, 0.5, 0.99][i++ % 3]!);
+    i = 0;
     const ms = nextDelayMs(PRESETS.brisk, DEFAULT_BUDGET, 500, rng);
-    expect(ms).toBeGreaterThan(120_000); // base ~26s + long rest ≥2min
+    expect(ms - base).toBeGreaterThanOrEqual(20_000);
+    expect(ms - base).toBeLessThanOrEqual(40_000);
   });
 });
 
