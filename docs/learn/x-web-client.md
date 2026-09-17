@@ -43,3 +43,11 @@
 ## 글 ID(스노우플레이크) 정렬
 - 트윗 ID는 시간순 증가 → ID 비교 = 작성 시각 비교. 단 **문자열 비교는 틀린다**: 2017-11 이전은 18자리, 이후는 19자리라 `'934…'(2017) > '1734…'(2024)`로 뒤집힘
 - 정렬은 자릿수 먼저, 같으면 사전순(`core/order.ts`). BigInt 없이 정확하고 빠름
+
+## 타임라인(스윕 모드) 셀렉터
+- 스캔 페이지: `/<handle>/with_replies` — 원글과 답글이 한 타임라인에 나온다. 프로필 기본 탭에는 답글이 없다
+- 카드: `article[data-testid="tweet"]`
+- 카드의 permalink: **`<time>`을 품은 `a[href]`**. 인용글·부모글 링크가 같은 카드 안에 있으므로 `a[href*="/status/"]` 첫 번째를 쓰면 안 된다
+- 리포스트·고정글: `[data-testid="socialContext"]` 텍스트로 판정(`재게시`/`repost`, `고정`/`pinned`). 리포스트 카드의 permalink는 원작성자 handle이라 handle 비교로도 걸러진다
+- 로그인 계정: `[data-testid="AppTabBar_Profile_Link"]`의 href(`/<handle>`). 스윕 대상 계정을 여기서만 정한다
+- 삭제는 상태 페이지와 동일한 경로가 타임라인에서도 통한다(카드 안 caret → 메뉴 → 확인). `deletePost`를 그대로 재사용

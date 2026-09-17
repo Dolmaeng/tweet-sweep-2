@@ -44,7 +44,7 @@
 - [ ] T31 `unretweet`·`unlike` 액션
 - [ ] T32 백그라운드(alarms) 모드
 - [x] T33 아카이브 이후 게시물 보충(프로필 스캔) → T34 스윕 모드로 흡수(ADR-0009)
-- [ ] T34 스윕 모드(FR-18): `core/timeline.ts` 후보 선택 · `executors/timeline-scan.ts` DOM 수집 · 프로토콜 3종(세션·스캔·스크롤) · `platform/sweep.ts` 루프 · 스윕 화면 — AC: 세션 handle 자동 판정, handle 입력 확인 없이는 실행 불가, 리포스트 미삭제, 고정글 마지막
+- [x] T34 스윕 모드(FR-18) — 6d8ff6d, a3f3a44, f834eaa. 라이브 검증 대기: `core/timeline.ts` 후보 선택 · `executors/timeline-scan.ts` DOM 수집 · 프로토콜 3종(세션·스캔·스크롤) · `platform/sweep.ts` 루프 · 스윕 화면 — AC: 세션 handle 자동 판정, handle 입력 확인 없이는 실행 불가, 리포스트 미삭제, 고정글 마지막
 
 ## M5 v2
 - [ ] T40 LLM 분류 필터
