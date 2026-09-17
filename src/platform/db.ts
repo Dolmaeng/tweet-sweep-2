@@ -238,6 +238,26 @@ export async function markItem(
   return removedCount;
 }
 
+/**
+ * 재개 시 실패·차단 항목을 다시 pending으로. attempts가 maxAttempts 이상이면 그대로 둔다.
+ * (일시 오류·셀렉터 수정 후 재시도 경로. 없으면 failed는 영영 건너뜀)
+ */
+export async function requeueFailed(jobId: string, maxAttempts = 3): Promise<number> {
+  const db = await getDb();
+  const tx = db.transaction('jobItems', 'readwrite');
+  let requeued = 0;
+  for (const status of ['failed', 'blocked'] as const) {
+    const rows = (await tx.store.index('byJobStatus').getAll([jobId, status])) as JobItem[];
+    for (const item of rows) {
+      if (item.attempts >= maxAttempts) continue;
+      await tx.store.put({ ...item, status: 'pending', doneAt: null });
+      requeued += 1;
+    }
+  }
+  await tx.done;
+  return requeued;
+}
+
 export async function appendAudit(ev: AuditEvent): Promise<void> {
   const db = await getDb();
   await db.add('audit', ev);

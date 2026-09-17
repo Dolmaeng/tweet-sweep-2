@@ -10,6 +10,7 @@ import {
   markItem,
   nextPending,
   pendingCount,
+  requeueFailed,
   resetDb,
   setJobStatus,
 } from '../../../src/platform/db';
@@ -59,6 +60,22 @@ describe('job persistence', () => {
     // 재시작: 다음 pending은 11 하나뿐
     expect(await nextPending('j1')).toBe('11');
     expect(await pendingCount('j1')).toBe(1);
+  });
+
+  it('requeues failed and blocked items on resume until attempts run out', async () => {
+    await createJob(job('j5', 3), ['50', '51', '52']);
+    await markItem('j5', '50', 'failed', 'dom_changed', false);
+    await markItem('j5', '51', 'blocked', 'auth_redirect', false);
+    await markItem('j5', '52', 'done', null, true);
+    expect(await pendingCount('j5')).toBe(0);
+    expect(await requeueFailed('j5')).toBe(2);
+    expect(await pendingCount('j5')).toBe(2);
+
+    for (let i = 0; i < 2; i++) await markItem('j5', '50', 'failed', 'dom_changed', false);
+    // attempts=3 → 더 이상 재큐 안 됨. '51'은 attempts=1이라 재큐
+    await markItem('j5', '51', 'failed', 'dom_changed', false);
+    expect(await requeueFailed('j5')).toBe(1);
+    expect(await nextPending('j5')).toBe('51');
   });
 
   it('completed jobs are not resumable', async () => {

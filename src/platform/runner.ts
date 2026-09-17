@@ -11,7 +11,14 @@ import { HARD_MIN_DELAY_MS, PRESETS, type RateBudget } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { statusUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
-import { itemStatusOf, markItem, nextPending, pendingCount, setJobStatus } from './db';
+import {
+  itemStatusOf,
+  markItem,
+  nextPending,
+  pendingCount,
+  requeueFailed,
+  setJobStatus,
+} from './db';
 import { deleteOnTab, ensureWorker, navigate, probeSettled, type Worker } from './worker-tab';
 
 export interface RunControls {
@@ -57,6 +64,7 @@ export async function runJob(
   const preset = ctx.floorMs ? { ...base, floorMs: Math.max(base.floorMs, ctx.floorMs) } : base;
   let worker: Worker | null = null;
 
+  await requeueFailed(ctx.job.id);
   await setJobStatus(ctx.job.id, 'running');
   onEvent({ type: 'running' });
 
