@@ -94,6 +94,7 @@ export function App() {
           onImport={() => setScreen({ name: 'import' })}
           onSettings={() => setScreen({ name: 'settings' })}
           onSweep={() => setScreen({ name: 'sweep' })}
+          onArchiveRun={(account) => void goRun(account)}
           onOpen={(account) => setScreen({ name: 'analyze', account })}
           onDelete={(account) => void remove(account)}
         />

@@ -20,7 +20,11 @@ describe('dashboard App', () => {
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
 
-    await screen.findByText('가져온 아카이브가 없습니다. 먼저 아카이브를 가져오세요.');
+    await screen.findByText('가져온 아카이브가 없습니다.');
+    // 아카이브가 없으면 아카이브 기반 삭제로 들어갈 수 없다
+    expect(screen.getByRole('button', { name: '아카이브로 삭제' }).hasAttribute('disabled')).toBe(
+      true,
+    );
     cleanup();
 
     // 다시 열면 고지를 건너뛴다 (동의 저장)

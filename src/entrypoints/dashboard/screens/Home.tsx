@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AccountRecord } from '../../../platform/db';
 import { fmtDate, fmtInt } from '../lib/format';
 
@@ -6,21 +7,33 @@ interface Props {
   onImport: () => void;
   onSettings: () => void;
   onSweep: () => void;
+  /** 아카이브 기반 삭제. 계정을 골라 들어간다 */
+  onArchiveRun: (account: AccountRecord) => void;
   onOpen: (account: AccountRecord) => void;
   onDelete: (account: AccountRecord) => void;
 }
 
-export function Home({ accounts, onImport, onSettings, onSweep, onOpen, onDelete }: Props) {
+/**
+ * 삭제 입구는 둘 다 여기 있다 (docs/spec/04-screens.md §3).
+ * 예전에는 아카이브 삭제가 `분석` 아래에 숨어 있어, 삭제하러 가는 길인 줄 모르고 들어갔다.
+ */
+export function Home({
+  accounts,
+  onImport,
+  onSettings,
+  onSweep,
+  onArchiveRun,
+  onOpen,
+  onDelete,
+}: Props) {
+  const [picked, setPicked] = useState('');
+  const target = accounts.find((a) => a.userId === picked) ?? accounts[0];
+
   return (
     <section className="card">
       <h2>계정</h2>
-      <p className="muted small">
-        아카이브 zip이 없으면 <b>아카이브 없이 삭제</b>로 로그인한 계정의 글을 최신부터 지울 수
-        있습니다. 목록·미리보기는 없지만, 그 화면의 보존 필터로 미디어·좋아요한 글 등을 남길 수
-        있습니다.
-      </p>
       {accounts.length === 0 ? (
-        <p className="muted">가져온 아카이브가 없습니다. 먼저 아카이브를 가져오세요.</p>
+        <p className="muted">가져온 아카이브가 없습니다.</p>
       ) : (
         <table>
           <thead>
@@ -66,11 +79,54 @@ export function Home({ accounts, onImport, onSettings, onSweep, onOpen, onDelete
           </tbody>
         </table>
       )}
+
+      <h3>지우기</h3>
+      <div className="modes">
+        <div className="mode">
+          <div className="mode-head">
+            <button
+              className="danger"
+              disabled={!target}
+              onClick={() => target && onArchiveRun(target)}
+            >
+              아카이브로 삭제
+            </button>
+            {accounts.length > 1 && (
+              <select
+                aria-label="삭제할 계정"
+                value={target?.userId ?? ''}
+                onChange={(e) => setPicked(e.target.value)}
+              >
+                {accounts.map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    @{a.username}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <p className="muted small">
+            {accounts.length === 0
+              ? '먼저 아카이브를 가져오세요.'
+              : '가져온 zip의 목록대로. 대상 건수·기간·글 ID 지정이 됩니다.'}
+          </p>
+        </div>
+
+        <div className="mode">
+          <div className="mode-head">
+            <button className="danger" onClick={onSweep}>
+              아카이브 없이 삭제
+            </button>
+          </div>
+          <p className="muted small">
+            로그인한 계정의 타임라인을 최신 글부터. 목록은 없지만 내가 좋아요·북마크한 글, 내가 올린
+            미디어를 남길 수 있습니다.
+          </p>
+        </div>
+      </div>
+
       <div className="actions">
         <button onClick={onImport}>아카이브 가져오기</button>
-        <button className="secondary" onClick={onSweep}>
-          아카이브 없이 삭제
-        </button>
         <button className="secondary" onClick={onSettings}>
           설정
         </button>

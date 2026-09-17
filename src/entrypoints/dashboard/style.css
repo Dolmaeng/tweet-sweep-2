@@ -281,3 +281,31 @@ input.wide {
 .recap-line {
   margin: 0 0 4px;
 }
+
+/* 삭제 입구 둘을 같은 무게로 나란히 (docs/spec/04-screens.md §3) */
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+@media (max-width: 720px) {
+  .modes {
+    grid-template-columns: 1fr;
+  }
+}
+.mode {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mode-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.mode p {
+  margin: 0;
+}
