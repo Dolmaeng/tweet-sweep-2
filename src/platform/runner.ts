@@ -13,6 +13,7 @@ import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { statusUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
 import {
+  getPostText,
   itemStatusOf,
   markItem,
   nextPending,
@@ -35,7 +36,15 @@ export interface BudgetSnapshot {
 }
 
 export type RunEvent =
-  | { type: 'item'; postId: string; result: ExecutionResult; removedCount: number; at: number }
+  | {
+      type: 'item';
+      postId: string;
+      /** 인벤토리에 보존해 둔 본문. 실시간 기록에 함께 보여준다 */
+      text: string;
+      result: ExecutionResult;
+      removedCount: number;
+      at: number;
+    }
   | { type: 'waiting'; reason: string; untilMs: number }
   /** 한 건 처리 후 다음 삭제까지 페이싱 수면 */
   | { type: 'sleeping'; untilMs: number }
@@ -112,6 +121,7 @@ export async function runJob(
     const postId = await nextPending(ctx.job.id, order);
     if (postId === null) continue;
 
+    const text = await getPostText(ctx.job.userId, postId);
     const startedAt = Date.now();
     let result: ExecutionResult;
     try {
@@ -135,7 +145,7 @@ export async function runJob(
       : toBreakerEvent(result);
     breaker = reduceBreaker(breaker, event, Date.now());
 
-    onEvent({ type: 'item', postId, result, removedCount, at: Date.now() });
+    onEvent({ type: 'item', postId, text, result, removedCount, at: Date.now() });
 
     // 간격은 '시작 시각 간 간격'(cadence). 탐색·클릭에 쓴 시간을 빼되 하드 최소는 지킨다
     const elapsed = Date.now() - startedAt;

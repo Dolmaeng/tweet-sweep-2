@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ExecutionResult, Job } from '../../../core/models';
+import type { Job } from '../../../core/models';
 import type { RunSettings } from '../../../core/settings';
 import { isFilterActive, NO_SWEEP_FILTER, type SweepFilter } from '../../../core/sweep-filter';
 import { createSweepJob, getResumableJob } from '../../../platform/db';
 import { loadSweepFilter, saveSweepFilter } from '../../../platform/settings';
 import { runSweep, type SweepEvent } from '../../../platform/sweep';
 import type { RunControls } from '../../../platform/runner';
+import { Feed, FEED_CAP, type FeedLine } from '../components/Feed';
 import { FilterPanel } from '../components/FilterPanel';
 import {
   ensureWorker,
@@ -21,14 +22,6 @@ interface Props {
   settings: RunSettings;
   onBack: () => void;
 }
-
-interface FeedLine {
-  at: number;
-  postId: string;
-  result: ExecutionResult;
-}
-
-const FEED_CAP = 300;
 
 function fmtClock(ms: number): string {
   const d = new Date(ms);
@@ -161,7 +154,10 @@ export function SweepRun({ settings, onBack }: Props) {
         setStatus('삭제 중');
         setWaiting(null);
         setFeed((f) =>
-          [{ at: ev.at, postId: ev.postId, result: ev.result }, ...f].slice(0, FEED_CAP),
+          [{ at: ev.at, postId: ev.postId, text: ev.text, result: ev.result }, ...f].slice(
+            0,
+            FEED_CAP,
+          ),
         );
         break;
       case 'searching':
@@ -293,22 +289,7 @@ export function SweepRun({ settings, onBack }: Props) {
           </p>
 
           <h3>실시간 기록</h3>
-          {feed.length === 0 ? (
-            <p className="muted small">아직 없음</p>
-          ) : (
-            <ul className="feed">
-              {feed.map((l) => (
-                <li
-                  key={`${l.postId}-${l.at}`}
-                  className={l.result.kind === 'ok' || l.result.kind === 'gone' ? 'ok' : 'bad'}
-                >
-                  <span className="mono">{new Date(l.at).toLocaleTimeString()}</span> {l.postId} →{' '}
-                  {l.result.kind}
-                  {'detail' in l.result && l.result.detail ? ` (${l.result.detail})` : ''}
-                </li>
-              ))}
-            </ul>
-          )}
+          <Feed lines={feed} />
         </>
       )}
     </section>

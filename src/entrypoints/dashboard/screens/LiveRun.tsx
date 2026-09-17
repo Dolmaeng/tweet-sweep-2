@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ExecutionResult, Job } from '../../../core/models';
+import type { Job } from '../../../core/models';
 import { ORDER_LABELS, coerceOrder } from '../../../core/order';
 import type { AccountRecord } from '../../../platform/db';
 import { getJob } from '../../../platform/db';
 import { runJob, type RunControls, type RunEvent } from '../../../platform/runner';
 import type { RunSettings } from '../../../core/settings';
+import { Feed, FEED_CAP, type FeedLine } from '../components/Feed';
 import { useBudget } from '../lib/budget';
 import { fmtInt } from '../lib/format';
 
@@ -14,14 +15,6 @@ interface Props {
   settings: RunSettings;
   onBack: () => void;
 }
-
-interface FeedLine {
-  at: number;
-  postId: string;
-  result: ExecutionResult;
-}
-
-const FEED_CAP = 300;
 
 function fmtClock(ms: number): string {
   const d = new Date(ms);
@@ -94,7 +87,10 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
         setStatus('삭제 중');
         setWaiting(null);
         setFeed((f) =>
-          [{ at: ev.at, postId: ev.postId, result: ev.result }, ...f].slice(0, FEED_CAP),
+          [{ at: ev.at, postId: ev.postId, text: ev.text, result: ev.result }, ...f].slice(
+            0,
+            FEED_CAP,
+          ),
         );
         break;
       case 'waiting':
@@ -174,22 +170,7 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
       </p>
 
       <h3>실시간 기록</h3>
-      {feed.length === 0 ? (
-        <p className="muted small">아직 없음</p>
-      ) : (
-        <ul className="feed">
-          {feed.map((l) => (
-            <li
-              key={`${l.postId}-${l.at}`}
-              className={l.result.kind === 'ok' || l.result.kind === 'gone' ? 'ok' : 'bad'}
-            >
-              <span className="mono">{new Date(l.at).toLocaleTimeString()}</span> {l.postId} →{' '}
-              {l.result.kind}
-              {'detail' in l.result && l.result.detail ? ` (${l.result.detail})` : ''}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Feed lines={feed} />
     </section>
   );
 }

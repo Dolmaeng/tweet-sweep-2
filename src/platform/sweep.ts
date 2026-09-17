@@ -29,7 +29,15 @@ import {
 
 export type SweepEvent =
   | { type: 'running' }
-  | { type: 'item'; postId: string; result: ExecutionResult; deleted: number; at: number }
+  | {
+      type: 'item';
+      postId: string;
+      /** 삭제 직전 카드에서 읽은 본문. 실시간 기록에 함께 보여준다 */
+      text: string;
+      result: ExecutionResult;
+      deleted: number;
+      at: number;
+    }
   | { type: 'waiting'; reason: string; untilMs: number }
   | { type: 'sleeping'; untilMs: number }
   /** 후보를 못 찾아 스크롤·새로고침으로 더 불러오는 중 */
@@ -114,6 +122,7 @@ export async function runSweep(
     const startedAt = Date.now();
     let result: ExecutionResult;
     let targetId: string | null = null;
+    let targetText = '';
     try {
       const w = await ensureWorker(worker);
       if (w !== worker) {
@@ -183,6 +192,7 @@ export async function runSweep(
 
       emptyStreak = 0;
       targetId = target.postId;
+      targetText = target.text;
       result = await deleteOnTab(w.tabId, target.postId, DEFAULT_UI_CONFIG);
       await appendAudit({
         ts: new Date().toISOString(),
@@ -212,7 +222,14 @@ export async function runSweep(
         : toBreakerEvent(result);
       breaker = reduceBreaker(breaker, event, Date.now());
 
-      onEvent({ type: 'item', postId: targetId, result, deleted, at: Date.now() });
+      onEvent({
+        type: 'item',
+        postId: targetId,
+        text: targetText,
+        result,
+        deleted,
+        at: Date.now(),
+      });
 
       // 아래로 내려가 있었다면 맨 위로 돌아가 최신부터 유지한다.
       // 필터가 켜져 있으면 보존한 글이 맨 위에 영구히 쌓인다. 돌아가면 그 벽을 매번

@@ -239,6 +239,12 @@ export async function setJobStatus(jobId: string, status: Job['status']): Promis
   if (job) await db.put('jobs', { ...job, status });
 }
 
+/** 실시간 기록에 함께 보여줄 본문. 인벤토리에 없으면 빈 문자열 */
+export async function getPostText(userId: string, postId: string): Promise<string> {
+  const db = await getDb();
+  return (await db.get('posts', [userId, postId]))?.text ?? '';
+}
+
 export async function pendingCount(jobId: string): Promise<number> {
   const db = await getDb();
   return db.countFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
