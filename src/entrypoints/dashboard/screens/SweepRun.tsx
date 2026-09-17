@@ -71,6 +71,9 @@ export function SweepRun({ settings, onBack }: Props) {
   const [checkError, setCheckError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const [filter, setFilter] = useState<SweepFilter>(NO_SWEEP_FILTER);
+  /** 저장해 둔 필터를 실제로 읽어왔는가. 읽기 전/실패는 "필터 없음"과 구별해야 한다 */
+  const [filterLoaded, setFilterLoaded] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [deleted, setDeleted] = useState(0);
   const [feed, setFeed] = useState<FeedLine[]>([]);
@@ -103,17 +106,27 @@ export function SweepRun({ settings, onBack }: Props) {
     };
   }, [checkNonce]);
 
+  // 읽기에 실패하면 조용히 NO_SWEEP_FILTER로 두면 안 된다. 그 상태로 시작하면 사용자가
+  // 체크해 둔 보존 조건(미디어 제외 등)이 없는 채로 전부 지워진다 — 되돌릴 수 없는 사고다.
   useEffect(() => {
-    void loadSweepFilter().then(setFilter);
+    void loadSweepFilter()
+      .then((f) => {
+        setFilter(f);
+        setFilterLoaded(true);
+      })
+      .catch((e: Error) => setFilterError(e.message));
   }, []);
 
   function changeFilter(next: SweepFilter) {
     setFilter(next);
-    void saveSweepFilter(next);
+    // 사용자가 직접 고른 값이면 저장값을 못 읽었더라도 그 값으로 시작해도 된다
+    setFilterLoaded(true);
+    setFilterError(null);
+    void saveSweepFilter(next).catch((e: Error) => setFilterError(e.message));
   }
 
   async function start() {
-    if (running || !username) return;
+    if (running || !username || !filterLoaded) return;
     const userId = username.toLowerCase();
     const prior = await getResumableJob(userId, 'sweep');
     // 이어서 할 때도 지금 화면의 필터를 쓴다. 작업 기록도 그 값으로 맞춘다
@@ -239,6 +252,15 @@ export function SweepRun({ settings, onBack }: Props) {
 
           <FilterPanel value={filter} onChange={changeFilter} disabled={running} />
 
+          {filterError !== null ? (
+            <p className="error">
+              저장해 둔 필터를 읽지 못했습니다({filterError}). 위에서 보존 조건을 다시 선택해야
+              시작할 수 있습니다.
+            </p>
+          ) : (
+            !filterLoaded && <p className="muted small">저장해 둔 필터 불러오는 중…</p>
+          )}
+
           {!running && (
             <label className="block">
               시작하려면 계정 이름 <code>{username}</code> 을 그대로 입력하세요
@@ -254,7 +276,10 @@ export function SweepRun({ settings, onBack }: Props) {
 
           <div className="actions">
             {!running ? (
-              <button onClick={() => void start()} disabled={!confirmed || ended === '완료'}>
+              <button
+                onClick={() => void start()}
+                disabled={!confirmed || !filterLoaded || ended === '완료'}
+              >
                 {deleted > 0
                   ? '이어서 삭제'
                   : isFilterActive(filter)

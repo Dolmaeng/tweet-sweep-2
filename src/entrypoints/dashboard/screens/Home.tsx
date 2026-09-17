@@ -15,8 +15,9 @@ export function Home({ accounts, onImport, onSettings, onSweep, onOpen, onDelete
     <section className="card">
       <h2>계정</h2>
       <p className="muted small">
-        아카이브 zip이 없으면 <b>아카이브 없이 삭제</b>로 로그인한 계정의 글을 최신부터 전부 지울 수
-        있습니다. 목록·필터·미리보기는 없습니다.
+        아카이브 zip이 없으면 <b>아카이브 없이 삭제</b>로 로그인한 계정의 글을 최신부터 지울 수
+        있습니다. 목록·미리보기는 없지만, 그 화면의 보존 필터로 미디어·좋아요한 글 등을 남길 수
+        있습니다.
       </p>
       {accounts.length === 0 ? (
         <p className="muted">가져온 아카이브가 없습니다. 먼저 아카이브를 가져오세요.</p>

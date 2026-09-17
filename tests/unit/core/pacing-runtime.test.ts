@@ -63,7 +63,7 @@ describe('nextDelayMs', () => {
       return () => seq[i++ % seq.length]!;
     };
     expect(nextDelayMs(PRESETS.brisk, DEFAULT_BUDGET, 500, draw())).toBeGreaterThan(30_000);
-    expect(nextDelayMs(PRESETS.rush, DEFAULT_BUDGET, 500, draw())).toBe(2_000);
+    expect(nextDelayMs(PRESETS.rush, DEFAULT_BUDGET, 500, draw())).toBe(1_000);
   });
 });
 

@@ -24,9 +24,9 @@ export interface RateBudget {
 
 /**
  * 하드 제약. 설정으로 초과 불가 (헌장 P1). 실측 L=200/15min 기준(ADR-0008).
- * 2초·u 0.95는 사용자가 정지 위험을 받아들이고 요구한 폭주 옵션의 상한이다(ADR-0011).
+ * 1초·u 0.95는 사용자가 정지 위험을 받아들이고 요구한 폭주 옵션의 상한이다(ADR-0011).
  */
-export const HARD_MIN_DELAY_MS = 2_000;
+export const HARD_MIN_DELAY_MS = 1_000;
 export const HARD_MAX_UTIL = 0.95;
 export const HARD_MAX_PER_DAY = 8_000;
 
@@ -39,7 +39,7 @@ export const PRESETS: Record<PresetName, PresetSpec> = {
   cautious: { name: 'cautious', utilization: 0.3, floorMs: 30_000, label: '신중' },
   normal: { name: 'normal', utilization: 0.5, floorMs: 18_000, label: '보통' },
   brisk: { name: 'brisk', utilization: 0.7, floorMs: 5_000, label: '빠름' },
-  rush: { name: 'rush', utilization: 0.95, floorMs: 2_000, label: '질주(2초)', burst: true },
+  rush: { name: 'rush', utilization: 0.95, floorMs: 1_000, label: '질주(1초)', burst: true },
 };
 
 export const DEFAULT_PRESET: PresetName = 'brisk';
@@ -120,7 +120,7 @@ export function nextDelayMs(
     ? floor
     : Math.max(floor, (budget.windowSec * 1000) / (u * budget.limit));
   let ms = base * lognormalMultiplier(rng);
-  // 긴 휴식은 사람처럼 보이려는 장치다. 폭주 모드는 그 위장을 포기했고, 2초 간격에서 비용이 너무 크다
+  // 긴 휴식은 사람처럼 보이려는 장치다. 폭주 모드는 그 위장을 포기했고, 1초 간격에서 비용이 너무 크다
   if (!preset.burst && rng() < 0.04) ms += (20 + rng() * 20) * 1000;
   return Math.max(floor, Math.round(ms));
 }

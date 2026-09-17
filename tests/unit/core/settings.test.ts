@@ -62,7 +62,7 @@ describe('validateRunSettings', () => {
 
   it('coerces corrupt stored values to defaults', () => {
     expect(coerceRunSettings(undefined)).toEqual(DEFAULT_RUN_SETTINGS);
-    expect(coerceRunSettings({ floorSec: 1 })).toEqual(DEFAULT_RUN_SETTINGS);
+    expect(coerceRunSettings({ floorSec: HARD_MIN_FLOOR_SEC / 2 })).toEqual(DEFAULT_RUN_SETTINGS);
     expect(coerceRunSettings({ activeStartHour: 0, activeEndHour: 24 })).toMatchObject({
       activeStartHour: 0,
       activeEndHour: 24,
