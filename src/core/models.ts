@@ -52,6 +52,8 @@ export interface Job {
   preset: PresetName;
   /** 없으면 'newest'(구버전 작업 호환) */
   order?: DeleteOrder;
+  /** 없으면 'archive'(구버전 작업 호환). 'sweep'은 아카이브 없이 타임라인을 훑는 모드(FR-18) */
+  mode?: 'archive' | 'sweep';
   createdAt: string;
   status: 'planned' | 'running' | 'paused' | 'halted' | 'completed';
   targetCount: number;
@@ -95,6 +97,9 @@ export interface AuditEvent {
   signal: Signal | null;
   durationMs: number;
   detail?: string;
+  /** 스윕 모드 스냅샷(FR-12 축소판): 삭제 직전 카드에서 읽은 본문·작성시각 */
+  text?: string;
+  createdAt?: string | null;
 }
 
 /** 주입 가능한 난수원 [0,1). 테스트에서 결정적으로 만들 수 있다 */
