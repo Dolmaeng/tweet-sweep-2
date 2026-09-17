@@ -46,5 +46,7 @@
 - [x] T33 아카이브 이후 게시물 보충(프로필 스캔) → T34 스윕 모드로 흡수(ADR-0009)
 - [x] T34 스윕 모드(FR-18) — 6d8ff6d, a3f3a44, f834eaa. 라이브 검증 대기: `core/timeline.ts` 후보 선택 · `executors/timeline-scan.ts` DOM 수집 · 프로토콜 3종(세션·스캔·스크롤) · `platform/sweep.ts` 루프 · 스윕 화면 — AC: 세션 handle 자동 판정, handle 입력 확인 없이는 실행 불가, 리포스트 미삭제, 고정글 마지막
 
+- [x] T35 스윕 보존 필터(FR-18a) — 라이브 검증 대기: `core/sweep-filter.ts` 판정 · `executors/timeline-scan.ts` 카드 신호 9종 · `components/FilterPanel.tsx` · 설정 저장 · 완료 판정 수정(처음 보는 카드가 있으면 계속 훑음) — AC: 보존 조건에 걸린 글 미삭제, 보존 글이 쌓여도 거짓 완료 없음, 실행 중 필터 잠금
+
 ## M5 v2
 - [ ] T40 LLM 분류 필터
