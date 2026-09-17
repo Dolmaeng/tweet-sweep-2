@@ -1,7 +1,7 @@
 # 화면 설계 · 스토리보드
 
-- 상태: 제안 · 2026-09-18 · 사용자 보고("'분석 → 삭제 실행'에는 필터링 옵션이 없다. UI가 헷갈린다")
-- 대상: 대시보드 전체 화면 흐름과 필터 UI. 결정되면 ADR-0012로 승격
+- 상태: 확정 · 2026-09-18 · 사용자 보고("'분석 → 삭제 실행'에는 필터링 옵션이 없다. UI가 헷갈린다")
+- 결정은 ADR-0012. 1~3단계 모두 구현 완료(T38)
 
 ## 1. 무엇이 잘못됐나
 
@@ -188,39 +188,50 @@
 
 `core/filters.ts`의 `FilterSpec`(아카이브)과 `core/sweep-filter.ts`의 `SweepFilter`(스윕)를 **`core/keep-filter.ts` 하나로 합친다**.
 
+구현된 모양:
+
 ```ts
 export interface KeepFilter {
-  mention: 'all' | 'only' | 'exclude';
-  kinds: PostKind[];              // 스윕은 무시
-  from?: string; to?: string;     // 스윕은 무시
-  keep: KeepFlag[];               // 미디어·좋아요·북마크… 다중 선택
-  keepMinLikes?: number;          // 스윕은 1로 고정 취급
-  keepMinRetweets?: number;
-  keepIds?: string[];             // 스윕은 무시
-  keywords: string;               // 제외 키워드(쉼표)
-  regex?: string;
+  // §1 대상 범위 — 포함 방향
+  mention: MentionMode;
+  kinds: PostKind[];
+  from: string; to: string;        // 'YYYY-MM-DD', '' = 제한 없음
+  includeKeyword: string;
+  includeRegex: string;
+  // §2 보존 — 제외 방향
+  keep: KeepFlag[];
+  keepMinLikes: string;            // 입력 원문. 파싱은 판정 직전 한 번
+  keepMinRetweets: string;
+  keepIds: string;
+  excludeKeywords: string;
 }
 
-/** 모드가 판정할 수 있는 조건. UI 잠금과 판정 로직이 같은 표를 본다 */
-export const CAPABILITY: Record<'archive' | 'sweep', Set<KeepFlag>>;
+/** UI 잠금과 판정 경계가 같은 표를 본다 */
+export const CAPABLE_FLAGS: Record<Mode, KeepFlag[]>;
+export const CAPABLE_FIELDS: Record<Mode, KeepField[]>;
 ```
 
-판정 함수는 모드별로 둘(`isTargetArchive` / `isExcludedSweep`)이되 **같은 `KeepFilter`를 읽는다**. 한쪽이 무시하는 필드는 `CAPABILITY`에 없고, UI는 그 표로 잠근다. 표가 하나이므로 화면과 로직이 어긋날 수 없다.
+숫자·날짜·id 목록까지 문자열로 들고 있는 이유: 이 값이 **저장값이자 폼 상태**다. 두 표현을 따로 두면 "화면에 보이는 값"과 "판정에 쓰이는 값"이 갈라질 자리가 또 생긴다.
+
+판정 함수는 모드별로 둘(`isTargetArchive` / `isKeptSweep`)이되 **같은 `KeepFilter`를 읽는다**. 한쪽이 무시하는 필드는 `CAPABLE_*`에 없고, UI는 그 표로 잠근다. 표가 하나이므로 화면과 로직이 어긋날 수 없다.
+
+방향을 하나로 통일하지 않고 섹션으로 가른 이유: "이 말이 든 글만 지우기"(포함)가 실제로 쓸모 있어 버릴 수 없다. 섹션 제목이 방향을 말하면 섞이지 않는다.
 
 ### 저장값 마이그레이션
 
-- `settings.sweepFilter`: 기존 `SweepFilter` → `KeepFilter`. `coerceKeepFilter()`가 구버전 키(`exclude[]`)를 읽어 옮긴다. 못 읽으면 **필터 없음이 아니라 오류**로 처리한다(664e9e5에서 넣은 가드와 같은 이유).
+- `settings.sweepFilter`: 기존 `SweepFilter` → `KeepFilter`. `coerceKeepFilter()`가 구버전 키(`exclude[]`·`keywords`)를 읽어 옮긴다. 플래그 이름이 같아 변환이 단순하다. 못 읽으면 **필터 없음이 아니라 오류**로 처리한다(d4a46ab에서 넣은 가드와 같은 이유).
+- `settings.archiveFilter`: 신규. 아카이브 필터도 이제 저장한다 — 매번 미디어 보존을 다시 체크하게 두면 같은 사고가 다시 난다.
 - `job.filterSpec`: `unknown`으로 저장돼 있어 스키마 변경에 안전하다. 이어서 하기(resume)는 화면의 현재 필터를 쓰므로 영향 없음.
 
-## 7. 단계
+## 7. 단계 (완료)
 
-| 단계 | 내용 | 위험 |
+| 단계 | 내용 | 커밋 |
 |---|---|---|
-| **1. 안전** | 아카이브 모드에 미디어 보존 조건 추가 + 두 화면에 모드 배너 · `분석`의 버튼을 `이 아카이브로 삭제`로 | 낮음. 지금 뚫려 있는 구멍을 막는다 |
-| **2. 통합** | `keep-filter.ts`로 모델 합치고 공유 컴포넌트 · 능력 매트릭스 잠금 UI · 되읽기 박스 | 중간. 저장값 마이그레이션 필요 |
-| **3. 입구** | 홈에 삭제 버튼 둘 나란히 · `분석`을 리포트로 · 계정 선택 단계 | 낮음 |
+| **1. 안전** | 아카이브 모드에 미디어 보존 조건 추가 + 두 화면에 모드 배너 · `분석`의 버튼을 `이 아카이브로 삭제`로 | e14da15 |
+| **2. 통합** | `keep-filter.ts`로 모델 합치고 공유 컴포넌트 · 능력 매트릭스 잠금 UI · 되읽기 박스 | 8b62650 |
+| **3. 입구** | 홈에 삭제 버튼 둘 나란히 · `분석`을 리포트로 · 계정 선택 | 04060d9 |
 
-1단계만으로도 이번 사고는 재발하지 않는다. 2단계가 "헷갈린다"의 본체다.
+1단계만으로도 이번 사고는 재발하지 않는다. 2단계가 "헷갈린다"의 본체였다.
 
 ## 8. 열린 질문
 
