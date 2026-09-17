@@ -8,6 +8,11 @@ export interface PresetSpec {
   /** 간격 하한(ms). 사용자 지정 구간 */
   floorMs: number;
   label: string;
+  /**
+   * 폭주 모드 (ADR-0011). 간격을 창 전체에 분산하지 않고 플로어로 달린다.
+   * 워밍업과 4% 긴 휴식도 건너뛴다. 창 예산이 바닥나면 스케줄러가 리셋까지 멈춘다.
+   */
+  burst?: boolean;
 }
 
 export interface RateBudget {
@@ -17,9 +22,12 @@ export interface RateBudget {
   windowSec: number;
 }
 
-/** 하드 제약. 설정으로 초과 불가 (헌장 P1). 수치는 ADR-0008(실측 L=200/15min 기준) */
-export const HARD_MIN_DELAY_MS = 5_000;
-export const HARD_MAX_UTIL = 0.7;
+/**
+ * 하드 제약. 설정으로 초과 불가 (헌장 P1). 실측 L=200/15min 기준(ADR-0008).
+ * 2초·u 0.95는 사용자가 정지 위험을 받아들이고 요구한 폭주 옵션의 상한이다(ADR-0011).
+ */
+export const HARD_MIN_DELAY_MS = 2_000;
+export const HARD_MAX_UTIL = 0.95;
 export const HARD_MAX_PER_DAY = 8_000;
 
 /** 헤더를 아직 관측하지 못했을 때의 가정 (공식 API 삭제 한도와 동일) */
@@ -31,15 +39,25 @@ export const PRESETS: Record<PresetName, PresetSpec> = {
   cautious: { name: 'cautious', utilization: 0.3, floorMs: 30_000, label: '신중' },
   normal: { name: 'normal', utilization: 0.5, floorMs: 18_000, label: '보통' },
   brisk: { name: 'brisk', utilization: 0.7, floorMs: 5_000, label: '빠름' },
+  rush: { name: 'rush', utilization: 0.95, floorMs: 2_000, label: '질주(2초)', burst: true },
 };
 
 export const DEFAULT_PRESET: PresetName = 'brisk';
 
-/** 기본 간격(ms) = max(플로어, 하드 최소, W ÷ (u·L)) */
+/** 화면 표시 순서(느린 것부터) */
+export const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk', 'rush'];
+
+/** 프리셋이 스스로 정한 최소 간격. 지터도 이 아래로는 내려가지 않는다 */
+export function floorMsOf(preset: PresetSpec): number {
+  return Math.max(preset.floorMs, HARD_MIN_DELAY_MS);
+}
+
+/** 기본 간격(ms) = max(플로어, 하드 최소, W ÷ (u·L)). 폭주 모드는 분산하지 않고 플로어 */
 export function baseIntervalMs(preset: PresetSpec, budget: RateBudget = DEFAULT_BUDGET): number {
+  const floor = floorMsOf(preset);
+  if (preset.burst) return floor;
   const u = Math.min(preset.utilization, HARD_MAX_UTIL);
-  const fromBudget = (budget.windowSec * 1000) / (u * budget.limit);
-  return Math.max(preset.floorMs, HARD_MIN_DELAY_MS, fromBudget);
+  return Math.max(floor, (budget.windowSec * 1000) / (u * budget.limit));
 }
 
 export interface Estimate {
@@ -55,7 +73,12 @@ export function estimate(
   activeHours: number = DEFAULT_ACTIVE_HOURS,
 ): Estimate {
   const intervalMs = baseIntervalMs(preset, budget);
-  const perDay = Math.min(HARD_MAX_PER_DAY, Math.floor((activeHours * 3600 * 1000) / intervalMs));
+  // 폭주 모드의 상한은 간격이 아니라 창 예산이다. 간격만으로 세면 리셋 대기를 빼먹어 과대평가된다
+  const perWindow = preset.burst
+    ? Math.min(preset.utilization, HARD_MAX_UTIL) * budget.limit
+    : (budget.windowSec * 1000) / intervalMs;
+  const windows = (activeHours * 3600) / budget.windowSec;
+  const perDay = Math.min(HARD_MAX_PER_DAY, Math.floor(perWindow * windows));
   return {
     intervalSec: Math.round(intervalMs / 1000),
     perDay,
@@ -68,6 +91,8 @@ export function estimate(
 /** 워밍업: 첫 100건 u=0.3(측정 겸), 다음 200건 동안 프리셋 u까지 선형 상승 */
 export function warmupUtil(preset: PresetSpec, deletedSoFar: number): number {
   const target = Math.min(preset.utilization, HARD_MAX_UTIL);
+  // 폭주 모드는 워밍업하지 않는다. 속도를 위해 위험을 받아들인 선택이다(ADR-0011)
+  if (preset.burst) return target;
   const start = Math.min(UNOBSERVED_UTIL, target);
   if (deletedSoFar < 100) return start;
   if (deletedSoFar < 300) return start + (target - start) * ((deletedSoFar - 100) / 200);
@@ -89,15 +114,15 @@ export function nextDelayMs(
   deletedSoFar: number,
   rng: Rng = Math.random,
 ): number {
+  const floor = floorMsOf(preset);
   const u = Math.min(warmupUtil(preset, deletedSoFar), HARD_MAX_UTIL);
-  const base = Math.max(
-    preset.floorMs,
-    HARD_MIN_DELAY_MS,
-    (budget.windowSec * 1000) / (u * budget.limit),
-  );
+  const base = preset.burst
+    ? floor
+    : Math.max(floor, (budget.windowSec * 1000) / (u * budget.limit));
   let ms = base * lognormalMultiplier(rng);
-  if (rng() < 0.04) ms += (20 + rng() * 20) * 1000;
-  return Math.max(HARD_MIN_DELAY_MS, Math.round(ms));
+  // 긴 휴식은 사람처럼 보이려는 장치다. 폭주 모드는 그 위장을 포기했고, 2초 간격에서 비용이 너무 크다
+  if (!preset.burst && rng() < 0.04) ms += (20 + rng() * 20) * 1000;
+  return Math.max(floor, Math.round(ms));
 }
 
 /** 잔여 예산이 (1−u)·L 아래면 창 리셋까지 기다린다(429 선제 회피, SRS §6) */

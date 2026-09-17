@@ -19,6 +19,9 @@ describe('warmupUtil', () => {
     expect(warmupUtil(PRESETS.brisk, 300)).toBe(0.7);
     expect(warmupUtil(PRESETS.brisk, 5000)).toBe(0.7);
   });
+  it('rush는 워밍업 없이 처음부터 최대 사용률로 간다 (ADR-0011)', () => {
+    expect(warmupUtil(PRESETS.rush, 0)).toBe(0.95);
+  });
 });
 
 describe('lognormalMultiplier', () => {
@@ -51,6 +54,16 @@ describe('nextDelayMs', () => {
     const ms = nextDelayMs(PRESETS.brisk, DEFAULT_BUDGET, 500, rng);
     expect(ms - base).toBeGreaterThanOrEqual(20_000);
     expect(ms - base).toBeLessThanOrEqual(40_000);
+  });
+
+  it('rush는 같은 난수에서도 긴 휴식을 붙이지 않는다 (ADR-0011)', () => {
+    const draw = () => {
+      const seq = [0.5, 0.5, 0.01, 0.5];
+      let i = 0;
+      return () => seq[i++ % seq.length]!;
+    };
+    expect(nextDelayMs(PRESETS.brisk, DEFAULT_BUDGET, 500, draw())).toBeGreaterThan(30_000);
+    expect(nextDelayMs(PRESETS.rush, DEFAULT_BUDGET, 500, draw())).toBe(2_000);
   });
 });
 

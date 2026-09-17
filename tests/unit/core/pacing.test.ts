@@ -42,3 +42,18 @@ describe('estimate', () => {
     expect(estimate(1, PRESETS.brisk, huge).perDay).toBe(HARD_MAX_PER_DAY);
   });
 });
+
+describe('rush — 폭주 프리셋 (ADR-0011)', () => {
+  it('간격을 창 전체에 분산하지 않고 플로어 2초로 달린다', () => {
+    expect(baseIntervalMs(PRESETS.rush)).toBe(2_000);
+    // 예산이 아무리 빠듯해도 간격은 늘어나지 않는다. 대신 스케줄러가 리셋까지 멈춘다
+    expect(baseIntervalMs(PRESETS.rush, { limit: 1, windowSec: 900 })).toBe(2_000);
+  });
+
+  it('하루 예상치는 간격이 아니라 창 예산으로 센다', () => {
+    const measured = { limit: 60, windowSec: 900 };
+    // 2초 간격만 세면 14시간에 25,200건이지만, 실제 상한은 창당 u·L = 57건
+    expect(estimate(1, PRESETS.rush, measured).perDay).toBe(3_192);
+    expect(estimate(1, PRESETS.rush, measured).intervalSec).toBe(2);
+  });
+});

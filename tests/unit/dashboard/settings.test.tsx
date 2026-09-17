@@ -9,7 +9,7 @@ describe('Settings screen', () => {
   it('refuses to save a floor below the hard minimum', () => {
     const onSave = vi.fn();
     render(<Settings value={DEFAULT_RUN_SETTINGS} onSave={onSave} onBack={() => {}} />);
-    fireEvent.change(screen.getByLabelText('간격 하한'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('간격 하한'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('listitem').textContent).toContain('하드 제약');

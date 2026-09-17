@@ -1,5 +1,5 @@
-import type { ArchiveSummary, PresetName } from '../../../core/models';
-import { DEFAULT_BUDGET, PRESETS, estimate } from '../../../core/pacing';
+import type { ArchiveSummary } from '../../../core/models';
+import { DEFAULT_BUDGET, PRESETS, PRESET_ORDER, estimate } from '../../../core/pacing';
 import { downloadText, fmtDate, fmtDays, fmtInt, toCsv } from '../lib/format';
 
 interface Props {
@@ -9,8 +9,6 @@ interface Props {
   onTestRun: () => void;
   onRun: () => void;
 }
-
-const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
 
 /** analyze 보고서 (FR-05). v1 대상 = 원글 + 답글 (RT 제외, SRS §2) */
 export function Analyze({ summary, importedAt, onBack, onTestRun, onRun }: Props) {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DeleteOrder, Job, PostKind, PresetName } from '../../../core/models';
 import { ORDER_LABELS } from '../../../core/order';
 import { selectTargets, type FilterSpec } from '../../../core/filters';
-import { PRESETS, estimate } from '../../../core/pacing';
+import { PRESETS, PRESET_ORDER, estimate } from '../../../core/pacing';
 import type { AccountRecord } from '../../../platform/db';
 import { createJob, listPosts } from '../../../platform/db';
 import { fmtDays, fmtInt } from '../lib/format';
@@ -14,7 +14,6 @@ interface Props {
   onBack: () => void;
 }
 
-const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
 const DELETE_ORDERS: DeleteOrder[] = ['newest', 'oldest'];
 
 export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }: Props) {

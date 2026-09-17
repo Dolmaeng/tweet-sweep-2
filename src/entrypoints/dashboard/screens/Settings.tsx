@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PresetName } from '../../../core/models';
-import { HARD_MAX_PER_DAY, PRESETS } from '../../../core/pacing';
+import { HARD_MAX_PER_DAY, PRESETS, PRESET_ORDER } from '../../../core/pacing';
 import { HARD_MIN_FLOOR_SEC, validateRunSettings, type RunSettings } from '../../../core/settings';
 
 interface Props {
@@ -8,8 +8,6 @@ interface Props {
   onSave: (next: RunSettings) => void;
   onBack: () => void;
 }
-
-const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
 
 export function Settings({ value, onSave, onBack }: Props) {
   const [preset, setPreset] = useState<string>(value.preset);
@@ -56,6 +54,14 @@ export function Settings({ value, onSave, onBack }: Props) {
           </option>
         ))}
       </select>
+      {PRESETS[preset as PresetName]?.burst && (
+        <div className="notice">
+          <b>정지 위험을 감수하는 옵션입니다.</b> 워밍업 없이 플로어 간격으로 달리고, 사람처럼
+          보이려는 긴 휴식도 하지 않습니다. 창 예산을 거의 다 쓰면 리셋까지 멈추므로{' '}
+          <b>하루 총량은 빠름보다 크게 늘지 않습니다</b> — 빨라지는 건 한 묶음 안에서입니다. 계정이
+          잠기면 프리셋을 낮추고 재개하세요.
+        </div>
+      )}
 
       <h3>활동 시간대</h3>
       <p className="muted small">

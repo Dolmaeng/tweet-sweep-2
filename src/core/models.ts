@@ -70,7 +70,8 @@ export interface JobItem {
   doneAt: string | null;
 }
 
-export type PresetName = 'cautious' | 'normal' | 'brisk';
+/** `rush`는 정지 위험을 받아들인 2초 폭주 옵션 (ADR-0011) */
+export type PresetName = 'cautious' | 'normal' | 'brisk' | 'rush';
 
 /** 실행기·네트워크 관측이 보고하는 신호 (SRS FR-09) */
 export type Signal =
