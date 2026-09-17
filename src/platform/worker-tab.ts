@@ -3,7 +3,8 @@
 import { browser } from 'wxt/browser';
 import type { ExecutionResult } from '../core/models';
 import type { UiClickConfig } from '../executors/types';
-import type { ContentCommand, ContentReply, PageProbe } from '../messaging/protocol';
+import type { TimelineItem } from '../core/timeline';
+import type { ContentCommand, ContentReply, PageProbe, ScrollTo } from '../messaging/protocol';
 
 export interface Worker {
   windowId: number;
@@ -91,6 +92,28 @@ export async function probeSettled(tabId: number, timeoutMs = 15_000): Promise<P
     if (Date.now() >= deadline) return last;
     await sleep(500);
   }
+}
+
+/** 로그인 세션의 handle. 스윕 대상 계정을 여기서만 정한다 (ADR-0009) */
+export async function sessionUsername(tabId: number): Promise<string | null> {
+  const reply = await send(tabId, { type: 'SESSION_INFO' });
+  if (reply.type !== 'SESSION') throw new Error('예상치 못한 응답');
+  return reply.username;
+}
+
+export async function scanOnTab(tabId: number): Promise<TimelineItem[]> {
+  const reply = await send(tabId, { type: 'SCAN_TIMELINE' });
+  if (reply.type !== 'SCAN') throw new Error('예상치 못한 응답');
+  return reply.items;
+}
+
+export async function scrollOnTab(tabId: number, to: ScrollTo): Promise<void> {
+  await send(tabId, { type: 'SCROLL', to });
+}
+
+export async function reloadTab(tabId: number): Promise<void> {
+  await browser.tabs.reload(tabId);
+  await waitComplete(tabId);
 }
 
 export async function deleteOnTab(

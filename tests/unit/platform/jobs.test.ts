@@ -4,6 +4,8 @@ import type { Job } from '../../../src/core/models';
 import {
   appendAudit,
   createJob,
+  createSweepJob,
+  getJob,
   getResumableJob,
   itemStatusOf,
   listAudit,
@@ -13,6 +15,7 @@ import {
   requeueFailed,
   resetDb,
   setJobStatus,
+  upsertJobItem,
 } from '../../../src/platform/db';
 
 function job(id: string, targetCount: number): Job {
@@ -106,6 +109,24 @@ describe('job persistence', () => {
       durationMs: 1200,
     });
     expect(await listAudit('j1')).toHaveLength(1);
+  });
+
+  it('sweep jobs record items on the fly and stay separate from archive jobs', async () => {
+    await createJob(job('archive1', 2), ['10', '11']);
+    await createSweepJob({ ...job('sweep1', 0), mode: 'sweep' });
+
+    // 모드가 다른 작업은 서로 섞이지 않는다
+    expect((await getResumableJob('u1'))?.id).toBe('archive1');
+    expect((await getResumableJob('u1', 'sweep'))?.id).toBe('sweep1');
+
+    // 목록이 없으므로 항목은 만나는 대로 생성된다
+    expect(await upsertJobItem('sweep1', '900', 'done', null, true)).toBe(1);
+    expect(await upsertJobItem('sweep1', '901', 'failed', 'dom_changed', false)).toBe(1);
+    expect(await upsertJobItem('sweep1', '902', 'done', null, true)).toBe(2);
+
+    const sweep = await getJob('sweep1');
+    expect(sweep?.removedCount).toBe(2);
+    expect(sweep?.targetCount).toBe(2); // 미리 알 수 없으므로 지운 만큼 따라 올라간다
   });
 
   it('maps execution results to item statuses', () => {

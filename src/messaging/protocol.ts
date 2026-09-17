@@ -1,6 +1,7 @@
 // 확장 내부 메시지 (plan §3). 대시보드(확장 페이지)가 작업 탭을 직접 몬다.
 // 서비스 워커는 네트워크 관측과 대시보드 열기만 맡는다 (ADR-0004).
 import type { ExecutionResult } from '../core/models';
+import type { TimelineItem } from '../core/timeline';
 import type { PageKind, UiClickConfig } from '../executors/types';
 
 export interface PageProbe {
@@ -9,13 +10,24 @@ export interface PageProbe {
   twid: string | null;
 }
 
+/** 스윕 모드에서 후보가 없을 때 페이지를 움직이는 방법 (FR-18) */
+export type ScrollTo = 'top' | 'more';
+
 /** 대시보드 → 콘텐츠 스크립트 (browser.tabs.sendMessage) */
 export type ContentCommand =
-  { type: 'PROBE_PAGE' } | { type: 'DELETE_POST'; postId: string; config: UiClickConfig };
+  | { type: 'PROBE_PAGE' }
+  | { type: 'DELETE_POST'; postId: string; config: UiClickConfig }
+  | { type: 'SESSION_INFO' }
+  | { type: 'SCAN_TIMELINE' }
+  | { type: 'SCROLL'; to: ScrollTo };
 
 /** 콘텐츠 스크립트 → 대시보드 (sendMessage 응답) */
 export type ContentReply =
-  { type: 'PROBE'; probe: PageProbe } | { type: 'DELETE'; result: ExecutionResult };
+  | { type: 'PROBE'; probe: PageProbe }
+  | { type: 'DELETE'; result: ExecutionResult }
+  | { type: 'SESSION'; username: string | null }
+  | { type: 'SCAN'; items: TimelineItem[] }
+  | { type: 'SCROLLED' };
 
 /** 서비스 워커 → 대시보드 (runtime 브로드캐스트, webRequest 관측) */
 export type NetEvent =

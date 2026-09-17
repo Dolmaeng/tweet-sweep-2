@@ -175,13 +175,57 @@ export async function createJob(job: Job, targetIds: string[]): Promise<void> {
   }
 }
 
-/** 재개 가능한 작업(계획/진행/일시정지) */
-export async function getResumableJob(userId: string): Promise<Job | undefined> {
+/** 재개 가능한 작업(계획/진행/일시정지). 모드가 다른 작업은 섞이지 않는다 */
+export async function getResumableJob(
+  userId: string,
+  mode: NonNullable<Job['mode']> = 'archive',
+): Promise<Job | undefined> {
   const db = await getDb();
   const jobs = await db.getAllFromIndex('jobs', 'byUser', userId);
   return jobs
+    .filter((j) => (j.mode ?? 'archive') === mode)
     .filter((j) => j.status === 'planned' || j.status === 'running' || j.status === 'paused')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+}
+
+/** 스윕 작업. 대상 목록이 없으므로 항목 없이 job만 만든다 (FR-18) */
+export async function createSweepJob(job: Job): Promise<void> {
+  const db = await getDb();
+  await db.put('jobs', { ...job, mode: 'sweep' });
+}
+
+/**
+ * 스윕에서 만난 글의 결과를 기록. 항목이 없으면 새로 만든다(목록을 미리 못 만들기 때문).
+ * removed면 job.removedCount 증가. 한 트랜잭션.
+ */
+export async function upsertJobItem(
+  jobId: string,
+  postId: string,
+  status: JobItemStatus,
+  signal: Signal | null,
+  removed: boolean,
+): Promise<number> {
+  const db = await getDb();
+  const tx = db.transaction(['jobItems', 'jobs'], 'readwrite');
+  const items = tx.objectStore('jobItems');
+  const jobs = tx.objectStore('jobs');
+  const existing = (await items.get([jobId, postId])) as JobItem | undefined;
+  await items.put({
+    jobId,
+    postId,
+    status,
+    attempts: (existing?.attempts ?? 0) + 1,
+    lastSignal: signal,
+    doneAt: new Date().toISOString(),
+  });
+  const job = (await jobs.get(jobId)) as Job | undefined;
+  let removedCount = job?.removedCount ?? 0;
+  if (job && removed) {
+    removedCount += 1;
+    await jobs.put({ ...job, removedCount, targetCount: Math.max(job.targetCount, removedCount) });
+  }
+  await tx.done;
+  return removedCount;
 }
 
 export async function getJob(jobId: string): Promise<Job | undefined> {
