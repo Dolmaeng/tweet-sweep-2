@@ -142,7 +142,7 @@ export function Analyze({ summary, importedAt, onBack, onTestRun, onRun }: Props
           삭제 테스트
         </button>
         <button className="danger" onClick={onRun}>
-          삭제 실행
+          이 아카이브로 삭제 →
         </button>
       </div>
     </section>

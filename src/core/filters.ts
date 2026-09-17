@@ -17,6 +17,8 @@ export interface FilterSpec {
   keepMinLikes?: number;
   /** 리포스트가 이 값 이상이면 보존 */
   keepMinRetweets?: number;
+  /** 미디어가 붙은 글은 보존. 아카이브는 인용글 미디어를 구분하지 못해 "있으면 보존"뿐이다 */
+  keepMedia?: boolean;
 }
 
 export const DEFAULT_KINDS: PostKind[] = ['post', 'reply'];
@@ -34,6 +36,7 @@ const RULES: Rule[] = [
   (p, s) => !(s.keepIds ?? []).includes(p.id),
   (p, s) => (s.keepMinLikes === undefined ? true : p.likeCount < s.keepMinLikes),
   (p, s) => (s.keepMinRetweets === undefined ? true : p.retweetCount < s.keepMinRetweets),
+  (p, s) => !(s.keepMedia === true && p.hasMedia),
 ];
 
 function safeRegex(src: string): RegExp {

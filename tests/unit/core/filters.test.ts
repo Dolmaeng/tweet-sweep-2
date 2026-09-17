@@ -75,6 +75,14 @@ describe('selectTargets', () => {
     expect(ids(selectTargets(POSTS, { keepMinRetweets: 100 }))).toEqual(['1', '2']);
   });
 
+  it('keeps posts with media (FR-04, 아카이브 모드에 없던 조건)', () => {
+    const withMedia = [...POSTS, post({ id: '5', hasMedia: true, mediaTypes: ['photo'] })];
+    expect(ids(selectTargets(withMedia, {}))).toEqual(['1', '2', '4', '5']);
+    expect(ids(selectTargets(withMedia, { keepMedia: true }))).toEqual(['1', '2', '4']);
+    // false는 조건 없음과 같다. 체크를 껐다고 미디어만 골라 지우지 않는다
+    expect(ids(selectTargets(withMedia, { keepMedia: false }))).toEqual(['1', '2', '4', '5']);
+  });
+
   it('combines conditions', () => {
     expect(ids(selectTargets(POSTS, { kinds: ['post'], keepMinRetweets: 100 }))).toEqual(['1']);
   });

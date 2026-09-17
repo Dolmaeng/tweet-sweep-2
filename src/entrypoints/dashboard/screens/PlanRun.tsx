@@ -35,6 +35,7 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
   const [keyword, setKeyword] = useState('');
   const [keepMinLikes, setKeepMinLikes] = useState('');
   const [keepIds, setKeepIds] = useState('');
+  const [keepMedia, setKeepMedia] = useState(false);
   const [preset, setPreset] = useState<PresetName>(defaultPreset);
   const [order, setOrder] = useState<DeleteOrder>('newest');
   const [creating, setCreating] = useState(false);
@@ -69,8 +70,9 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
       .map((x) => x.replace(/\D/g, ''))
       .filter(Boolean);
     if (ids.length) s.keepIds = ids;
+    if (keepMedia) s.keepMedia = true;
     return s;
-  }, [includePosts, includeReplies, from, to, keyword, keepMinLikes, keepIds]);
+  }, [includePosts, includeReplies, from, to, keyword, keepMinLikes, keepIds, keepMedia]);
 
   const targets = useMemo(() => (posts ? selectTargets(posts as never, spec) : []), [posts, spec]);
   const est = estimate(targets.length, PRESETS[preset]);
@@ -97,7 +99,12 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
 
   return (
     <section className="card">
-      <h2>삭제 계획 — @{account.username}</h2>
+      <h2>삭제 계획 — 아카이브 모드 · @{account.username}</h2>
+      <div className="notice">
+        <b>아카이브 모드</b>입니다. 가져온 zip의 목록대로 지웁니다. 아카이브에 없는 정보(내가
+        좋아요·북마크한 글 여부, 아카이브 생성 이후에 쓴 글)로는 거를 수 없습니다. 그 조건이
+        필요하면 홈의 <b>아카이브 없이 삭제</b>를 쓰세요.
+      </div>
       {posts === null ? (
         <p className="muted">글 불러오는 중…</p>
       ) : (
@@ -149,6 +156,20 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
               />
             </label>
           </div>
+          <h3>보존(지우지 않을 글)</h3>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={keepMedia}
+              onChange={(e) => setKeepMedia(e.target.checked)}
+            />
+            미디어가 있는 글 제외 (사진·영상·GIF)
+          </label>
+          <p className="muted small">
+            아카이브는 인용한 글의 미디어를 구분하지 못해 &quot;있으면 보존&quot;만 됩니다. 내가
+            올린 것만 남기려면 <b>아카이브 없이 삭제</b>를 쓰세요.
+          </p>
+
           <label className="block">
             보존할 글 ID(고정글 등, 쉼표로 구분)
             <input

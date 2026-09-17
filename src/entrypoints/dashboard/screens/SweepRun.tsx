@@ -199,7 +199,7 @@ export function SweepRun({ settings, onBack }: Props) {
 
   return (
     <section className="card">
-      <h2>아카이브 없이 삭제 (스윕)</h2>
+      <h2>아카이브 없이 삭제 — 스윕 모드</h2>
 
       <div className="notice">
         <b>되돌릴 수 없습니다.</b> 이 모드는 목록도 미리보기도 없이, 로그인한 계정의 원글과 답글을
