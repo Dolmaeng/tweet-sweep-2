@@ -39,3 +39,7 @@
 - 함정: 재게시 버튼은 `aria-haspopup="menu"`를 가짐 → caret 대체 셀렉터로 aria-haspopup 쓰면 재게시 메뉴(`재게시 retweetConfirm | 인용하세요`)를 잘못 엶. 절대 금지
 - 삭제 메뉴 항목: `[role="menuitem"]` 중 텍스트 "삭제"/"Delete"
 - 확인: `[data-testid="confirmationSheetConfirm"]`
+
+## 글 ID(스노우플레이크) 정렬
+- 트윗 ID는 시간순 증가 → ID 비교 = 작성 시각 비교. 단 **문자열 비교는 틀린다**: 2017-11 이전은 18자리, 이후는 19자리라 `'934…'(2017) > '1734…'(2024)`로 뒤집힘
+- 정렬은 자릿수 먼저, 같으면 사전순(`core/order.ts`). BigInt 없이 정확하고 빠름
