@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { PresetName } from '../../../core/models';
 import { HARD_MAX_PER_DAY, PRESETS, PRESET_ORDER } from '../../../core/pacing';
-import { HARD_MIN_FLOOR_SEC, validateRunSettings, type RunSettings } from '../../../core/settings';
+import { validateRunSettings, type RunSettings } from '../../../core/settings';
 
 interface Props {
   value: RunSettings;
@@ -16,6 +16,10 @@ export function Settings({ value, onSave, onBack }: Props) {
   const [floor, setFloor] = useState(value.floorSec === null ? '' : String(value.floorSec));
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+
+  // 배너용. 저장 전 입력값을 그대로 읽는다 — 저장해야만 보이면 경고가 늦다
+  const typed = Number(floor.trim());
+  const customSec = floor.trim() !== '' && Number.isFinite(typed) && typed > 0 ? typed : null;
 
   function save() {
     const v = validateRunSettings({
@@ -96,16 +100,18 @@ export function Settings({ value, onSave, onBack }: Props) {
         </label>
       </div>
 
-      <h3>간격 하한(초)</h3>
+      <h3>삭제 간격(초)</h3>
       <p className="muted small">
-        비우면 프리셋 값을 씁니다. 하드 제약 {HARD_MIN_FLOOR_SEC}초 미만은 저장되지 않습니다. 일일
-        절대 상한 {HARD_MAX_PER_DAY.toLocaleString('ko-KR')}건은 변경할 수 없습니다.
+        비우면 위 프리셋을 씁니다. 값을 넣으면 <b>프리셋 대신 그 간격으로 달립니다</b> — 0.3을
+        넣으면 0.3초입니다. 0보다 크기만 하면 되고 소수도 됩니다. 일일 절대 상한{' '}
+        {HARD_MAX_PER_DAY.toLocaleString('ko-KR')}건과 예산 감시는 그대로 작동합니다.
       </p>
       <label className="block">
-        간격 하한
+        삭제 간격
         <input
           type="number"
-          min={HARD_MIN_FLOOR_SEC}
+          step="any"
+          min={0}
           value={floor}
           placeholder="프리셋 값"
           onChange={(e) => {
@@ -114,6 +120,18 @@ export function Settings({ value, onSave, onBack }: Props) {
           }}
         />
       </label>
+      {customSec !== null && (
+        <div className="notice">
+          <b>{customSec}초</b>마다 지웁니다(지터로 ±). 프리셋의 예산 분산·워밍업·긴 휴식을
+          건너뜁니다.
+          {customSec < 1 && (
+            <>
+              {' '}
+              <b>1초 미만은 사람으로 보이지 않습니다.</b> 계정 잠금 위험을 받아들인 선택입니다.
+            </>
+          )}
+        </div>
+      )}
 
       {errors.length > 0 && (
         <ul className="error">

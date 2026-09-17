@@ -8,7 +8,7 @@ import {
 } from '../core/breaker';
 import type { DeleteOrder, ExecutionResult, Job, Signal } from '../core/models';
 import { coerceOrder } from '../core/order';
-import { HARD_MIN_DELAY_MS, PRESETS, type RateBudget } from '../core/pacing';
+import { PRESETS, withCustomInterval, type RateBudget } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { statusUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
@@ -56,8 +56,8 @@ export interface RunContext {
   username: string;
   activeStartHour: number;
   activeEndHour: number;
-  /** 사용자 지정 간격 플로어(ms). 프리셋 플로어보다 클 때만 의미 있음 */
-  floorMs?: number;
+  /** 사용자 지정 간격(초). 있으면 프리셋 대신 이 값으로 달린다 (ADR-0013) */
+  intervalSec?: number | null;
 }
 
 const MAX_WAIT_SLICE = 60_000;
@@ -72,7 +72,7 @@ export async function runJob(
   let deletedSoFar = ctx.job.removedCount;
   const order: DeleteOrder = coerceOrder(ctx.job.order);
   const base = PRESETS[ctx.job.preset];
-  const preset = ctx.floorMs ? { ...base, floorMs: Math.max(base.floorMs, ctx.floorMs) } : base;
+  const preset = withCustomInterval(base, ctx.intervalSec ?? null);
   let worker: Worker | null = null;
 
   await requeueFailed(ctx.job.id);
@@ -147,9 +147,9 @@ export async function runJob(
 
     onEvent({ type: 'item', postId, text, result, removedCount, at: Date.now() });
 
-    // 간격은 '시작 시각 간 간격'(cadence). 탐색·클릭에 쓴 시간을 빼되 하드 최소는 지킨다
+    // 간격은 '시작 시각 간 간격'(cadence). 탐색·클릭에 쓴 시간을 뺀다
     const elapsed = Date.now() - startedAt;
-    const delay = Math.max(HARD_MIN_DELAY_MS - elapsed, pacingDelayMs(snap) - elapsed, 0);
+    const delay = Math.max(pacingDelayMs(snap) - elapsed, 0);
     onEvent({ type: 'sleeping', untilMs: Date.now() + delay });
     await sleep(delay, controls);
   }

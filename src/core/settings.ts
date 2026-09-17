@@ -1,6 +1,6 @@
 // 실행 설정 (FR-14). 순수 검증: 하드 제약(헌장 P1, pacing.ts)을 넘는 값은 저장 자체를 거부한다.
 import type { PresetName } from './models';
-import { HARD_MIN_DELAY_MS, PRESETS } from './pacing';
+import { PRESETS } from './pacing';
 
 export interface RunSettings {
   preset: PresetName;
@@ -8,7 +8,10 @@ export interface RunSettings {
   activeStartHour: number;
   /** 활동 시간대 끝(1~24, 정수). 24 = 자정까지 */
   activeEndHour: number;
-  /** 간격 플로어(초) 사용자 지정. null이면 프리셋 플로어 */
+  /**
+   * 삭제 간격(초) 사용자 지정. null이면 프리셋을 따른다.
+   * 0보다 크기만 하면 되고 실수도 된다(0.3 → 0.3초). 상한은 없다 (ADR-0013).
+   */
   floorSec: number | null;
 }
 
@@ -18,8 +21,6 @@ export const DEFAULT_RUN_SETTINGS: RunSettings = {
   activeEndHour: 23,
   floorSec: null,
 };
-
-export const HARD_MIN_FLOOR_SEC = HARD_MIN_DELAY_MS / 1000;
 
 export type Validation = { ok: true; value: RunSettings } | { ok: false; errors: string[] };
 
@@ -44,12 +45,13 @@ export function validateRunSettings(input: {
   if (Number.isInteger(start) && Number.isInteger(end) && start >= end)
     errors.push('활동 시작 시각은 종료 시각보다 앞서야 합니다');
 
+  // 상한은 없고 하한도 "0보다 크다"뿐이다. 실수를 그대로 받는다(0.3 → 0.3초, ADR-0013)
   let floorSec: number | null = null;
-  if (input.floorSec !== null && input.floorSec !== '') {
-    const f = Number(input.floorSec);
-    if (!Number.isFinite(f)) errors.push('간격 하한은 숫자여야 합니다');
-    else if (f < HARD_MIN_FLOOR_SEC)
-      errors.push(`간격 하한은 ${HARD_MIN_FLOOR_SEC}초 미만으로 낮출 수 없습니다(하드 제약)`);
+  const raw = typeof input.floorSec === 'string' ? input.floorSec.trim() : input.floorSec;
+  if (raw !== null && raw !== '') {
+    const f = Number(raw);
+    if (!Number.isFinite(f)) errors.push('삭제 간격은 숫자여야 합니다');
+    else if (f <= 0) errors.push('삭제 간격은 0보다 커야 합니다');
     else floorSec = f;
   }
 

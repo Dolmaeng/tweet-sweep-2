@@ -7,7 +7,7 @@ import {
   type KeepFilter,
   type TargetPost,
 } from '../../../core/keep-filter';
-import { PRESETS, PRESET_ORDER, estimate } from '../../../core/pacing';
+import { PRESETS, PRESET_ORDER, estimate, withCustomInterval } from '../../../core/pacing';
 import type { AccountRecord } from '../../../platform/db';
 import { createJob, listPosts } from '../../../platform/db';
 import { loadKeepFilter, saveKeepFilter } from '../../../platform/settings';
@@ -18,13 +18,21 @@ import { fmtDays, fmtInt } from '../lib/format';
 interface Props {
   account: AccountRecord;
   defaultPreset?: PresetName;
+  /** 사용자 지정 간격(초). 예상 소요를 이 값으로 센다 */
+  intervalSec?: number | null;
   onPlanned: (job: Job) => void;
   onBack: () => void;
 }
 
 const DELETE_ORDERS: DeleteOrder[] = ['newest', 'oldest'];
 
-export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }: Props) {
+export function PlanRun({
+  account,
+  defaultPreset = 'brisk',
+  intervalSec = null,
+  onPlanned,
+  onBack,
+}: Props) {
   const [posts, setPosts] = useState<TargetPost[] | null>(null);
   const [filter, setFilter] = useState<KeepFilter>(NO_KEEP_FILTER);
   /** 저장해 둔 필터를 실제로 읽어왔는가. 읽기 전/실패는 "필터 없음"과 구별해야 한다 */
@@ -71,7 +79,8 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
   }
 
   const targets = useMemo(() => (posts ? selectTargets(posts, filter) : []), [posts, filter]);
-  const est = estimate(targets.length, PRESETS[preset]);
+  // 사용자 지정 간격이 있으면 예상 소요도 그 값으로 센다. 프리셋으로 세면 화면이 거짓말을 한다
+  const est = estimate(targets.length, withCustomInterval(PRESETS[preset], intervalSec));
 
   async function makePlan() {
     if (!filterLoaded) return;

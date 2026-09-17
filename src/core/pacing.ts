@@ -24,9 +24,11 @@ export interface RateBudget {
 
 /**
  * 하드 제약. 설정으로 초과 불가 (헌장 P1). 실측 L=200/15min 기준(ADR-0008).
- * 1초·u 0.95는 사용자가 정지 위험을 받아들이고 요구한 폭주 옵션의 상한이다(ADR-0011).
+ *
+ * 간격 하한은 더 이상 없다. 사용자가 정지 위험을 알고 직접 정하겠다고 요구했다(ADR-0013).
+ * 0보다 크기만 하면 된다 — 그 검증은 core/settings.ts가 한다.
+ * 예산 사용률과 일일 총량 상한은 남는다. 이 둘은 속도가 아니라 429·헤더 오독을 막는 장치다.
  */
-export const HARD_MIN_DELAY_MS = 1_000;
 export const HARD_MAX_UTIL = 0.95;
 export const HARD_MAX_PER_DAY = 8_000;
 
@@ -49,10 +51,22 @@ export const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk', 'rush'
 
 /** 프리셋이 스스로 정한 최소 간격. 지터도 이 아래로는 내려가지 않는다 */
 export function floorMsOf(preset: PresetSpec): number {
-  return Math.max(preset.floorMs, HARD_MIN_DELAY_MS);
+  return preset.floorMs;
 }
 
-/** 기본 간격(ms) = max(플로어, 하드 최소, W ÷ (u·L)). 폭주 모드는 분산하지 않고 플로어 */
+/**
+ * 사용자 지정 간격(ADR-0013). 있으면 프리셋 대신 이 값이 곧 간격이 된다.
+ *
+ * 플로어만 갈아끼우면 안 된다. 분산 산식 W÷(u·L)이 더 크면 Math.max에 걸려
+ * 0.3초를 넣어도 6.4초로 달린다 — ADR-0011에서 프리셋 플로어만 낮췄을 때와 같은 함정이다.
+ * 그래서 burst를 함께 켜 분산·워밍업·긴 휴식을 건너뛴다. 프리셋은 예산 사용률 u만 남긴다.
+ */
+export function withCustomInterval(base: PresetSpec, sec: number | null): PresetSpec {
+  if (sec === null) return base;
+  return { ...base, floorMs: sec * 1000, burst: true, label: `사용자 지정(${sec}초)` };
+}
+
+/** 기본 간격(ms) = max(플로어, W ÷ (u·L)). 폭주 모드는 분산하지 않고 플로어 */
 export function baseIntervalMs(preset: PresetSpec, budget: RateBudget = DEFAULT_BUDGET): number {
   const floor = floorMsOf(preset);
   if (preset.burst) return floor;
@@ -73,10 +87,12 @@ export function estimate(
   activeHours: number = DEFAULT_ACTIVE_HOURS,
 ): Estimate {
   const intervalMs = baseIntervalMs(preset, budget);
-  // 폭주 모드의 상한은 간격이 아니라 창 예산이다. 간격만으로 세면 리셋 대기를 빼먹어 과대평가된다
+  // 폭주 모드는 창 예산과 간격 둘 다에 걸린다. 예산만 세면 느린 사용자 지정 간격에서,
+  // 간격만 세면 빠른 간격에서 과대평가된다(리셋 대기를 빼먹는다)
+  const byInterval = (budget.windowSec * 1000) / intervalMs;
   const perWindow = preset.burst
-    ? Math.min(preset.utilization, HARD_MAX_UTIL) * budget.limit
-    : (budget.windowSec * 1000) / intervalMs;
+    ? Math.min(Math.min(preset.utilization, HARD_MAX_UTIL) * budget.limit, byInterval)
+    : byInterval;
   const windows = (activeHours * 3600) / budget.windowSec;
   const perDay = Math.min(HARD_MAX_PER_DAY, Math.floor(perWindow * windows));
   return {

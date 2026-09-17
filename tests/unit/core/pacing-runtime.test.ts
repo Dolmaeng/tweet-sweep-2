@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_BUDGET,
-  HARD_MIN_DELAY_MS,
   PRESETS,
   lognormalMultiplier,
   nextActiveStart,
@@ -37,11 +36,11 @@ describe('lognormalMultiplier', () => {
 });
 
 describe('nextDelayMs', () => {
-  it('never goes below the hard minimum', () => {
-    const fast = { ...PRESETS.brisk, floorMs: 0 };
+  it('never goes below the preset floor', () => {
+    const fast = { ...PRESETS.brisk, floorMs: 300 };
     const big = { limit: 100_000, windowSec: 900 };
     for (const r of [0.001, 0.25, 0.5, 0.75, 0.999]) {
-      expect(nextDelayMs(fast, big, 500, () => r)).toBeGreaterThanOrEqual(HARD_MIN_DELAY_MS);
+      expect(nextDelayMs(fast, big, 500, () => r)).toBeGreaterThanOrEqual(300);
     }
   });
   it('adds a 20~40s rest when the 4% draw hits', () => {

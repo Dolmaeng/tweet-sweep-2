@@ -7,7 +7,7 @@ import {
   type BreakerState,
 } from '../core/breaker';
 import type { ExecutionResult, Job, Signal } from '../core/models';
-import { HARD_MIN_DELAY_MS, PRESETS } from '../core/pacing';
+import { PRESETS, withCustomInterval } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { isFilterActive, isKeptSweep, type KeepFilter } from '../core/keep-filter';
 import { nextRecovery, pickSweepTarget } from '../core/timeline';
@@ -52,7 +52,8 @@ export interface SweepContext {
   filter: KeepFilter;
   activeStartHour: number;
   activeEndHour: number;
-  floorMs?: number;
+  /** 사용자 지정 간격(초). 있으면 프리셋 대신 이 값으로 달린다 (ADR-0013) */
+  intervalSec?: number | null;
 }
 
 const MAX_WAIT_SLICE = 60_000;
@@ -66,7 +67,7 @@ export async function runSweep(
   let breaker: BreakerState = initialBreaker;
   let deleted = ctx.job.removedCount;
   const base = PRESETS[ctx.job.preset];
-  const preset = ctx.floorMs ? { ...base, floorMs: Math.max(base.floorMs, ctx.floorMs) } : base;
+  const preset = withCustomInterval(base, ctx.intervalSec ?? null);
 
   let worker: Worker | null = null;
   let onTimeline = false;
@@ -244,8 +245,9 @@ export async function runSweep(
       }
     }
 
+    // 간격은 시작 시각 간 간격(cadence). 탐색·클릭에 쓴 시간을 뺀다
     const elapsed = Date.now() - startedAt;
-    const delay = Math.max(HARD_MIN_DELAY_MS - elapsed, pacingDelayMs(snap) - elapsed, 0);
+    const delay = Math.max(pacingDelayMs(snap) - elapsed, 0);
     onEvent({ type: 'sleeping', untilMs: Date.now() + delay });
     await sleep(delay, controls);
   }

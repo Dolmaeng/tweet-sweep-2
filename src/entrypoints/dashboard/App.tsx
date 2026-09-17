@@ -128,6 +128,7 @@ export function App() {
         <PlanRun
           account={screen.account}
           defaultPreset={runSettings.preset}
+          intervalSec={runSettings.floorSec}
           onPlanned={(job) => setScreen({ name: 'live', account: screen.account, job })}
           onBack={() => setScreen({ name: 'home' })}
         />

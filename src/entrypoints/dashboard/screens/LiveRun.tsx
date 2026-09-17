@@ -68,7 +68,7 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
         username: account.username,
         activeStartHour: settings.activeStartHour,
         activeEndHour: settings.activeEndHour,
-        ...(settings.floorSec !== null ? { floorMs: settings.floorSec * 1000 } : {}),
+        intervalSec: settings.floorSec,
       },
       controls,
       source,
