@@ -42,11 +42,16 @@ export interface ArchiveSummary {
 export type JobItemStatus =
   'pending' | 'running' | 'done' | 'gone' | 'blocked' | 'failed' | 'skipped';
 
+/** 삭제 순서 (FR-10a). 기본은 최신 글부터 */
+export type DeleteOrder = 'newest' | 'oldest';
+
 export interface Job {
   id: string;
   userId: string;
   filterSpec: unknown;
   preset: PresetName;
+  /** 없으면 'newest'(구버전 작업 호환) */
+  order?: DeleteOrder;
   createdAt: string;
   status: 'planned' | 'running' | 'paused' | 'halted' | 'completed';
   targetCount: number;

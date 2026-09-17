@@ -42,7 +42,7 @@ describe('job persistence', () => {
   it('marks items and advances removedCount only for removals', async () => {
     await createJob(job('j1', 3), ['10', '11', '12']);
 
-    expect(await nextPending('j1')).toBe('10');
+    expect(await nextPending('j1')).toBe('12'); // 기본은 최신부터
     const after1 = await markItem('j1', '10', 'done', null, true);
     expect(after1).toBe(1);
 
@@ -52,6 +52,17 @@ describe('job persistence', () => {
     expect(await pendingCount('j1')).toBe(0);
     const resumable = await getResumableJob('u1');
     expect(resumable?.removedCount).toBe(2); // done + gone, not the failure
+  });
+
+  it('deletes newest first by default and oldest first when asked', async () => {
+    // 18자리(옛 글)와 19자리가 섞인 실제 상황: 문자열 순이면 '934…'가 최신으로 오인된다
+    await createJob(job('j6', 3), [
+      '934000000000000000',
+      '1734000000000000000',
+      '795000000000000000',
+    ]);
+    expect(await nextPending('j6', 'newest')).toBe('1734000000000000000');
+    expect(await nextPending('j6', 'oldest')).toBe('795000000000000000');
   });
 
   it('resume picks pending items after a restart, without duplicates', async () => {

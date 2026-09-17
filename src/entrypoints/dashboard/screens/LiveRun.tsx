@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExecutionResult, Job } from '../../../core/models';
+import { ORDER_LABELS, coerceOrder } from '../../../core/order';
 import type { AccountRecord } from '../../../platform/db';
 import { getJob } from '../../../platform/db';
 import { runJob, type RunControls, type RunEvent } from '../../../platform/runner';
@@ -40,6 +41,7 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
   const [waiting, setWaiting] = useState<{ reason: string; untilMs: number } | null>(null);
   const [nextAt, setNextAt] = useState<number | null>(null);
 
+  const order = coerceOrder(job.order);
   const paused = useRef(false);
   const stopped = useRef(false);
   const target = job.targetCount;
@@ -126,7 +128,7 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
         <div className="bar-fill" style={{ width: `${pct}%` }} />
       </div>
       <p className="muted small">
-        상태: {status}
+        순서: {ORDER_LABELS[order]} · 상태: {status}
         {nextAt !== null && !waiting ? ` · 다음 삭제 ${fmtClock(nextAt)}` : ''}
       </p>
       {waiting && (

@@ -6,7 +6,8 @@ import {
   type BreakerEvent,
   type BreakerState,
 } from '../core/breaker';
-import type { ExecutionResult, Job, Signal } from '../core/models';
+import type { DeleteOrder, ExecutionResult, Job, Signal } from '../core/models';
+import { coerceOrder } from '../core/order';
 import { HARD_MIN_DELAY_MS, PRESETS, type RateBudget } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { statusUrl } from '../core/xurl';
@@ -60,6 +61,7 @@ export async function runJob(
 ): Promise<void> {
   let breaker: BreakerState = initialBreaker;
   let deletedSoFar = ctx.job.removedCount;
+  const order: DeleteOrder = coerceOrder(ctx.job.order);
   const base = PRESETS[ctx.job.preset];
   const preset = ctx.floorMs ? { ...base, floorMs: Math.max(base.floorMs, ctx.floorMs) } : base;
   let worker: Worker | null = null;
@@ -107,7 +109,7 @@ export async function runJob(
     }
 
     // cmd.type === 'delete'
-    const postId = await nextPending(ctx.job.id);
+    const postId = await nextPending(ctx.job.id, order);
     if (postId === null) continue;
 
     const startedAt = Date.now();

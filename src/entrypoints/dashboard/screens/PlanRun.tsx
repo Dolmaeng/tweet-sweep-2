@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Job, PostKind, PresetName } from '../../../core/models';
+import type { DeleteOrder, Job, PostKind, PresetName } from '../../../core/models';
+import { ORDER_LABELS } from '../../../core/order';
 import { selectTargets, type FilterSpec } from '../../../core/filters';
 import { PRESETS, estimate } from '../../../core/pacing';
 import type { AccountRecord } from '../../../platform/db';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 const PRESET_ORDER: PresetName[] = ['cautious', 'normal', 'brisk'];
+const DELETE_ORDERS: DeleteOrder[] = ['newest', 'oldest'];
 
 export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }: Props) {
   const [posts, setPosts] = useState<
@@ -35,6 +37,7 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
   const [keepMinLikes, setKeepMinLikes] = useState('');
   const [keepIds, setKeepIds] = useState('');
   const [preset, setPreset] = useState<PresetName>(defaultPreset);
+  const [order, setOrder] = useState<DeleteOrder>('newest');
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
       userId: account.userId,
       filterSpec: spec,
       preset,
+      order,
       createdAt: new Date().toISOString(),
       status: 'planned',
       targetCount: targets.length,
@@ -155,6 +159,19 @@ export function PlanRun({ account, defaultPreset = 'brisk', onPlanned, onBack }:
               placeholder="선택"
             />
           </label>
+
+          <h3>삭제 순서</h3>
+          <select
+            aria-label="삭제 순서"
+            value={order}
+            onChange={(e) => setOrder(e.target.value as DeleteOrder)}
+          >
+            {DELETE_ORDERS.map((o) => (
+              <option key={o} value={o}>
+                {ORDER_LABELS[o]}
+              </option>
+            ))}
+          </select>
 
           <h3>속도</h3>
           <select value={preset} onChange={(e) => setPreset(e.target.value as PresetName)}>

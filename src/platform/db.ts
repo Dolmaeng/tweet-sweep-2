@@ -1,10 +1,12 @@
 // IndexedDB 저장소 (plan §2). 계정(userId) 기준으로 모든 상태를 분리한다 (FR-13).
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { pickNextPostId } from '../core/order';
 import type {
   Account,
   ArchiveSummary,
   AuditEvent,
   ExecutionResult,
+  DeleteOrder,
   Job,
   JobItem,
   JobItemStatus,
@@ -198,11 +200,23 @@ export async function pendingCount(jobId: string): Promise<number> {
   return db.countFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
 }
 
-/** 다음 pending 항목의 postId(없으면 null). 상태는 바꾸지 않는다 */
-export async function nextPending(jobId: string): Promise<string | null> {
+/**
+ * 다음 pending 항목의 postId(없으면 null). 상태는 바꾸지 않는다.
+ *
+ * 인덱스 순서(= ID 문자열 순)에 기대지 않고 pending 키를 모두 읽어 극값을 고른다.
+ * 이유: 스노우플레이크 ID는 자릿수가 달라(18↔19) 문자열 순이 시간순과 어긋난다.
+ * 대상 수만 건에서도 키 조회 수십 ms로, 삭제 간격(수 초) 대비 무시할 수준이다.
+ */
+export async function nextPending(
+  jobId: string,
+  order: DeleteOrder = 'newest',
+): Promise<string | null> {
   const db = await getDb();
-  const item = await db.getFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
-  return item?.postId ?? null;
+  const keys = await db.getAllKeysFromIndex('jobItems', 'byJobStatus', [jobId, 'pending']);
+  return pickNextPostId(
+    keys.map((k) => k[1]),
+    order,
+  );
 }
 
 /** 항목 결과 반영. removed면 job.removedCount 증가. 한 트랜잭션 */
