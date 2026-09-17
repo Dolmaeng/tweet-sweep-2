@@ -31,11 +31,18 @@ export function detectPageKind(doc: Document, pathname: string): PageKind {
 }
 
 /**
- * 삭제 대상 글. 상태 페이지(x.com/user/status/id)로 직접 이동했으므로 대상은 첫 번째 글이다.
- * 링크 매칭으로 답글을 잘못 고르지 않도록 첫 article을 쓴다.
+ * 삭제 대상 글. 상태 페이지는 답글이면 **원글(남의 글)을 위에 먼저** 렌더하므로 첫 article은 대상이
+ * 아닐 수 있다(2026-09-17 라이브에서 원글 메뉴가 열려 실패). 그래서 `/status/<postId>` 링크를 가진
+ * article을 고른다. 링크 매칭이 안 되고 article이 하나뿐이면 그것을 쓴다(렌더 초기·구형 DOM 대비).
  */
-export function findTargetArticle(doc: Document): Element | null {
-  return doc.querySelector('article[data-testid="tweet"]');
+export function findTargetArticle(doc: Document, postId: string): Element | null {
+  const articles = Array.from(doc.querySelectorAll('article[data-testid="tweet"]'));
+  const re = new RegExp(`/status/${postId}(?:[/?#]|$)`);
+  for (const a of articles) {
+    const links = Array.from(a.querySelectorAll<HTMLAnchorElement>('a[href]'));
+    if (links.some((l) => re.test(l.getAttribute('href') ?? ''))) return a;
+  }
+  return articles.length === 1 ? articles[0]! : null;
 }
 
 export function findCaret(scope: ParentNode): HTMLElement | null {
@@ -48,10 +55,12 @@ export function findCaret(scope: ParentNode): HTMLElement | null {
 
 /**
  * 포커스된 글의 더보기 버튼. 상태 페이지에서 X는 그 버튼을 article 밖 헤더에 두기도 한다.
- * 문서 전체에서는 반드시 data-testid="caret"만 쓴다(왼쪽 내비의 "더 보기"를 집지 않도록).
+ * 문서 전체에서는 반드시 data-testid="caret"만 쓰고(왼쪽 내비의 "더 보기" 배제), **다른 article 안의
+ * caret은 제외**한다(위에 렌더된 원글의 caret을 집으면 남의 글 메뉴가 열린다).
  */
 export function findFocusedCaret(doc: Document): HTMLElement | null {
-  return doc.querySelector<HTMLElement>('[data-testid="caret"]');
+  const carets = Array.from(doc.querySelectorAll<HTMLElement>('[data-testid="caret"]'));
+  return carets.find((c) => c.closest('article') === null) ?? null;
 }
 
 function itemLabel(el: Element): string {
@@ -115,11 +124,15 @@ export async function deletePost(
   if (kind === 'locked') return { kind: 'blocked', signal: 'account_locked' };
   if (kind !== 'tweet') return { kind: 'error', signal: 'dom_changed', detail: `page:${kind}` };
 
-  const article = await waitFor(() => findTargetArticle(doc), config.timeouts.element, sleep);
-  if (!article) return { kind: 'error', signal: 'timeout', detail: `article(${domCounts(doc)})` };
+  const article = await waitFor(
+    () => findTargetArticle(doc, postId),
+    config.timeouts.element,
+    sleep,
+  );
+  if (!article)
+    return { kind: 'error', signal: 'dom_changed', detail: `target(${domCounts(doc)})` };
 
   // 대상 글 안의 더보기를 먼저, 없으면 포커스된 글의 더보기(article 밖 헤더)를 쓴다.
-  // 상태 페이지의 첫 caret은 포커스된 글의 것이므로 안전하다.
   const caret = await waitFor(
     () => findCaret(article) ?? findFocusedCaret(doc),
     config.timeouts.element,

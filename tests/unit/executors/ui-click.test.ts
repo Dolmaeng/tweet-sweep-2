@@ -60,7 +60,7 @@ const TWEET_PAGE = `
 describe('element finders', () => {
   it('finds the first tweet article, its caret, delete item, and confirm', () => {
     const doc = setBody(TWEET_PAGE);
-    const article = findTargetArticle(doc);
+    const article = findTargetArticle(doc, '999');
     expect(article).not.toBeNull();
     expect(findCaret(article!)).not.toBeNull();
     expect(findDeleteMenuItem(doc, DEFAULT_UI_CONFIG.labels)?.textContent?.trim()).toBe('삭제');
@@ -71,7 +71,7 @@ describe('element finders', () => {
     const doc = setBody(
       '<article data-testid="tweet"><button aria-label="더 보기"></button></article>',
     );
-    expect(findCaret(findTargetArticle(doc)!)).not.toBeNull();
+    expect(findCaret(findTargetArticle(doc, '1')!)).not.toBeNull();
   });
 
   it('matches a delete item by aria-label or data-testid, not only text', () => {
@@ -115,6 +115,58 @@ describe('deletePost', () => {
     const result = await deletePost(doc, '/u/status/5', '5', DEFAULT_UI_CONFIG, noSleep);
     expect(result).toEqual({ kind: 'ok' });
     expect(caretClick).toHaveBeenCalledOnce();
+  });
+
+  it('targets the reply by id, not the parent tweet rendered above it', async () => {
+    // 답글 상태 페이지: 남의 원글이 먼저 → 원글 caret을 누르면 언팔로우·차단 메뉴가 열린다(라이브 실패 사례)
+    const doc = setBody(`
+      <article data-testid="tweet">
+        <a href="/other/status/111"></a>
+        <button data-testid="caret" id="parent-caret"></button>
+      </article>
+      <article data-testid="tweet">
+        <a href="/u/status/222?s=20"></a>
+        <button data-testid="caret" id="target-caret"></button>
+      </article>
+      <div role="menu"><div role="menuitem"><span>삭제</span></div></div>
+      <button data-testid="confirmationSheetConfirm"></button>
+    `);
+    const parent = vi.spyOn(doc.getElementById('parent-caret')!, 'click');
+    const target = vi.spyOn(doc.getElementById('target-caret')!, 'click');
+    const result = await deletePost(doc, '/u/status/222', '222', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({ kind: 'ok' });
+    expect(parent).not.toHaveBeenCalled();
+    expect(target).toHaveBeenCalledOnce();
+  });
+
+  it('skips a parent article caret when the focused caret sits in the header', async () => {
+    const doc = setBody(`
+      <article data-testid="tweet">
+        <a href="/other/status/111"></a>
+        <button data-testid="caret" id="parent-caret"></button>
+      </article>
+      <button data-testid="caret" id="header-caret"></button>
+      <article data-testid="tweet"><a href="/u/status/222"></a></article>
+      <div role="menu"><div role="menuitem"><span>삭제</span></div></div>
+      <button data-testid="confirmationSheetConfirm"></button>
+    `);
+    const parent = vi.spyOn(doc.getElementById('parent-caret')!, 'click');
+    const header = vi.spyOn(doc.getElementById('header-caret')!, 'click');
+    const result = await deletePost(doc, '/u/status/222', '222', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({ kind: 'ok' });
+    expect(parent).not.toHaveBeenCalled();
+    expect(header).toHaveBeenCalledOnce();
+  });
+
+  it('refuses when several articles exist and none carries the target id', async () => {
+    const doc = setBody(`
+      <article data-testid="tweet"><a href="/other/status/111"></a><button data-testid="caret"></button></article>
+      <article data-testid="tweet"><a href="/other/status/333"></a><button data-testid="caret"></button></article>
+    `);
+    const fast = { labels: ['삭제'], timeouts: { element: 20, confirm: 20 } };
+    const result = await deletePost(doc, '/u/status/222', '222', fast, noSleep);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') expect(result.detail).toMatch(/^target\(/);
   });
 
   it('does not treat a repost button as the more-menu caret', async () => {

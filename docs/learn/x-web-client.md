@@ -34,8 +34,8 @@
 - https://twaffle.net/%ED%8A%B8%EC%99%80%ED%94%8C-%EC%B2%AD%EC%86%8C%EA%B8%B0%ED%99%95%EC%9E%A5%ED%98%95-%EA%B0%80%EC%9D%B4%EB%93%9C/ (딜레이 권고·차단 경고)
 
 ## 검증된 UI 셀렉터 (2026-09-17, 실제 삭제 성공)
-- 대상 글: 상태 페이지의 첫 `article[data-testid="tweet"]`
-- 더보기(…): `[data-testid="caret"]`. **상태 페이지에서는 이 버튼이 article 요소 바깥(헤더)에 있음** → 문서 전체에서 첫 caret을 잡아야 함
+- 대상 글: `article[data-testid="tweet"]` 중 `a[href]`가 `/status/<postId>`를 가리키는 것. **답글 페이지는 원글(남의 글)이 위에 먼저 렌더**되므로 첫 article은 위험(2026-09-17 라이브: 원글 메뉴 `언팔로우|차단|신고`가 열려 연속 오류 정지). article이 하나뿐일 때만 링크 없이 허용
+- 더보기(…): `[data-testid="caret"]`. **상태 페이지에서는 이 버튼이 article 요소 바깥(헤더)에 있음** → 문서 전체에서 잡되 **다른 article 안에 있는 caret은 제외**(위 원글의 caret 오집음 방지)
 - 함정: 재게시 버튼은 `aria-haspopup="menu"`를 가짐 → caret 대체 셀렉터로 aria-haspopup 쓰면 재게시 메뉴(`재게시 retweetConfirm | 인용하세요`)를 잘못 엶. 절대 금지
 - 삭제 메뉴 항목: `[role="menuitem"]` 중 텍스트 "삭제"/"Delete"
 - 확인: `[data-testid="confirmationSheetConfirm"]`
