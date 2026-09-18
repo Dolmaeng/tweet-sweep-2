@@ -102,6 +102,9 @@ export async function runJob(
     const cmd = decide(snap, Date.now());
 
     if (cmd.type === 'done') {
+      // 오류로 건너뛴 글을 이 실행 안에서 다시 집는다. 그러지 않으면 밤새 도는 동안
+      // 실패한 글이 그대로 남은 채 "완료"가 된다. attempts 상한이 있어 유한하다.
+      if ((await requeueFailed(ctx.job.id)) > 0) continue;
       await setJobStatus(ctx.job.id, 'completed');
       onEvent({ type: 'ended', reason: '완료', completed: true });
       return;

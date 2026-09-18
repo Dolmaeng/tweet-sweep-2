@@ -9,7 +9,7 @@ export interface BreakerState {
   until: number;
   /** 오늘 발생한 rate-limit/차단 횟수 */
   blocksToday: number;
-  /** 연속 오류 수 */
+  /** 연속 오류 수. 진단용 카운터일 뿐 이 값으로 중지하지 않는다 */
   consecutiveErrors: number;
   /** halted 사유(사람 확인용) */
   reason?: string;
@@ -43,13 +43,10 @@ export function reduceBreaker(
     case 'gone':
       return { ...state, status: 'closed', until: 0, consecutiveErrors: 0 };
 
-    case 'error': {
-      const consecutiveErrors = state.consecutiveErrors + 1;
-      if (consecutiveErrors >= 3) {
-        return { ...state, status: 'halted', consecutiveErrors, reason: '연속 오류 3회' };
-      }
-      return { ...state, consecutiveErrors };
-    }
+    // 연속 오류로는 멈추지 않는다(사용자 요청). 횟수는 진단용으로만 센다.
+    // 429·차단·잠금은 아래 case들이 그대로 잡는다.
+    case 'error':
+      return { ...state, consecutiveErrors: state.consecutiveErrors + 1 };
 
     case 'blocked':
       return {

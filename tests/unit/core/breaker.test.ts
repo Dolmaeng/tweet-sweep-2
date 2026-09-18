@@ -12,13 +12,10 @@ describe('reduceBreaker', () => {
     expect(ok).toMatchObject({ status: 'closed', consecutiveErrors: 0 });
   });
 
-  it('halts after 3 consecutive errors', () => {
+  it('연속 오류로는 멈추지 않는다 — 세지기만 한다', () => {
     let s = initialBreaker;
-    s = reduceBreaker(s, { type: 'error' }, NOW, half);
-    s = reduceBreaker(s, { type: 'error' }, NOW, half);
-    expect(s.status).toBe('closed');
-    s = reduceBreaker(s, { type: 'error' }, NOW, half);
-    expect(s.status).toBe('halted');
+    for (let i = 0; i < 10; i++) s = reduceBreaker(s, { type: 'error' }, NOW, half);
+    expect(s).toMatchObject({ status: 'closed', consecutiveErrors: 10 });
   });
 
   it('halts immediately on auth/lock', () => {

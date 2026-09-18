@@ -58,6 +58,9 @@ export interface SweepContext {
 
 const MAX_WAIT_SLICE = 60_000;
 
+/** 건너뛴 카드를 다시 훑는 라운드 상한. 무한 재시도를 막는다 */
+const SKIP_RETRY_ROUNDS = 3;
+
 export async function runSweep(
   ctx: SweepContext,
   controls: RunControls,
@@ -75,6 +78,8 @@ export async function runSweep(
   let emptyStreak = 0;
   /** 시도했지만 못 지운 글. 같은 카드를 무한히 다시 집지 않게 한다 */
   const skip = new Set<string>();
+  /** 건너뛴 카드를 다시 훑은 횟수 */
+  let retryRounds = 0;
   /** 이번 실행에서 한 번이라도 스캔한 글. 스크롤이 새 카드를 불러왔는지 판정한다 */
   const seen = new Set<string>();
   const filtered = isFilterActive(ctx.filter, 'sweep');
@@ -173,8 +178,32 @@ export async function runSweep(
         emptyStreak = fresh ? 0 : emptyStreak + 1;
         const recovery = nextRecovery(emptyStreak);
         if (recovery === 'done') {
+          // 오류로 건너뛴 카드를 다시 훑는다. 그러지 않으면 밤새 도는 동안 실패한 글이
+          // 남은 채 "더 지울 글이 없습니다"가 된다. 라운드 상한이 있어 유한하다.
+          if (skip.size > 0 && retryRounds < SKIP_RETRY_ROUNDS) {
+            retryRounds += 1;
+            onEvent({
+              type: 'searching',
+              note: `건너뛴 ${skip.size}건 다시 시도 (${retryRounds}/${SKIP_RETRY_ROUNDS})`,
+            });
+            skip.clear();
+            seen.clear();
+            emptyStreak = 0;
+            await reloadTab(w.tabId);
+            await probeSettled(w.tabId);
+            scrolledAway = false;
+            await sleep(1500, controls);
+            continue;
+          }
           await setJobStatus(ctx.job.id, 'completed');
-          onEvent({ type: 'ended', reason: '더 지울 글이 없습니다', completed: true });
+          onEvent({
+            type: 'ended',
+            reason:
+              skip.size > 0
+                ? `더 지울 글이 없습니다 (${skip.size}건은 오류로 건너뜀)`
+                : '더 지울 글이 없습니다',
+            completed: true,
+          });
           return;
         }
         if (recovery === 'reload') {
