@@ -6,6 +6,8 @@ import {
   type BreakerEvent,
   type BreakerState,
 } from '../core/breaker';
+import { pageBackoffMs } from '../core/backoff';
+import { isPageLevelSignal } from '../core/models';
 import type { DeleteOrder, ExecutionResult, Job, Signal } from '../core/models';
 import { coerceOrder } from '../core/order';
 import { PRESETS, withCustomInterval, type RateBudget } from '../core/pacing';
@@ -74,6 +76,8 @@ export async function runJob(
   const base = PRESETS[ctx.job.preset];
   const preset = withCustomInterval(base, ctx.intervalSec ?? null);
   let worker: Worker | null = null;
+  /** 연속 페이지 장애 횟수. 백오프 단계를 정한다 (ADR-0014) */
+  let pageFailStreak = 0;
 
   await requeueFailed(ctx.job.id);
   await setJobStatus(ctx.job.id, 'running');
@@ -139,7 +143,16 @@ export async function runJob(
 
     const removed = result.kind === 'ok' || result.kind === 'gone';
     const signal: Signal | null = 'signal' in result ? result.signal : null;
-    const removedCount = await markItem(ctx.job.id, postId, itemStatusOf(result), signal, removed);
+    // 페이지가 안 열린 건 이 글의 잘못이 아니다. 재시도 횟수를 깎지 않는다 (ADR-0014)
+    const pageLevel = isPageLevelSignal(signal);
+    const removedCount = await markItem(
+      ctx.job.id,
+      postId,
+      itemStatusOf(result),
+      signal,
+      removed,
+      !pageLevel,
+    );
     if (removed) deletedSoFar = removedCount;
 
     // 백그라운드가 429를 봤으면 그것이 우선(rate-limit 회로차단)
@@ -149,6 +162,20 @@ export async function runJob(
     breaker = reduceBreaker(breaker, event, Date.now());
 
     onEvent({ type: 'item', postId, text, result, removedCount, at: Date.now() });
+
+    // 페이지 장애가 이어지면 멈추지 않고 물러나 기다린다. 그냥 건너뛰면 창 예산이
+    // 바닥난 동안 남은 글을 전부 실패로 소진한다 (ADR-0014)
+    pageFailStreak = pageLevel ? pageFailStreak + 1 : 0;
+    if (pageFailStreak > 0) {
+      const backoff = pageBackoffMs(pageFailStreak);
+      onEvent({
+        type: 'waiting',
+        reason: `페이지를 열지 못했습니다 (${pageFailStreak}회 연속) — 물러나 대기`,
+        untilMs: Date.now() + backoff,
+      });
+      await sleep(backoff, controls);
+      continue;
+    }
 
     // 간격은 '시작 시각 간 간격'(cadence). 탐색·클릭에 쓴 시간을 뺀다
     const elapsed = Date.now() - startedAt;

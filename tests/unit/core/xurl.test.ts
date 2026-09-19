@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isGraphqlDelete, profileUrl, statusUrl } from '../../../src/core/xurl';
+import { graphqlOperation, isGraphqlDelete, profileUrl, statusUrl } from '../../../src/core/xurl';
 
 describe('xurl', () => {
   it('builds status and profile URLs', () => {
@@ -14,5 +14,12 @@ describe('xurl', () => {
     );
     expect(isGraphqlDelete('https://x.com/i/api/graphql/AbC123xyz/CreateTweet')).toBe(false);
     expect(isGraphqlDelete('https://x.com/i/api/graphql/AbC/FavoriteTweet')).toBe(false);
+  });
+  it('연산명을 읽는다 — 읽기 버킷도 관측해야 한다 (ADR-0014)', () => {
+    expect(graphqlOperation('https://x.com/i/api/graphql/Abc/TweetDetail')).toBe('TweetDetail');
+    expect(graphqlOperation('https://x.com/i/api/graphql/Ab/UserTweetsAndReplies?v=1')).toBe(
+      'UserTweetsAndReplies',
+    );
+    expect(graphqlOperation('https://x.com/home')).toBeNull();
   });
 });

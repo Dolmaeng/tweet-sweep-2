@@ -81,7 +81,17 @@ export type Signal =
   | 'not_found'
   | 'dom_changed'
   | 'timeout'
+  /** 글이 아니라 페이지가 안 열렸다(429 뒤의 "Something went wrong" 등). 그 글의 잘못이 아니다 */
+  | 'page_unavailable'
   | 'unknown_error';
+
+/**
+ * 이 실패가 글 하나의 문제가 아니라 페이지·세션 전체의 문제인가 (ADR-0014).
+ * 페이지 단위 실패는 그 글의 재시도 횟수를 깎지 않고, 루프는 건너뛰는 대신 물러나 기다린다.
+ */
+export function isPageLevelSignal(signal: Signal | null): boolean {
+  return signal === 'page_unavailable' || signal === 'unknown_error';
+}
 
 export type ExecutionResult =
   | { kind: 'ok' }

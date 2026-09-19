@@ -6,6 +6,8 @@ import {
   type BreakerEvent,
   type BreakerState,
 } from '../core/breaker';
+import { pageBackoffMs } from '../core/backoff';
+import { isPageLevelSignal } from '../core/models';
 import type { ExecutionResult, Job, Signal } from '../core/models';
 import { PRESETS, withCustomInterval } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
@@ -80,6 +82,8 @@ export async function runSweep(
   const skip = new Set<string>();
   /** 건너뛴 카드를 다시 훑은 횟수 */
   let retryRounds = 0;
+  /** 연속 페이지 장애 횟수. 백오프 단계를 정한다 (ADR-0014) */
+  let pageFailStreak = 0;
   /** 이번 실행에서 한 번이라도 스캔한 글. 스크롤이 새 카드를 불러왔는지 판정한다 */
   const seen = new Set<string>();
   const filtered = isFilterActive(ctx.filter, 'sweep');
@@ -209,7 +213,22 @@ export async function runSweep(
         if (recovery === 'reload') {
           onEvent({ type: 'searching', note: '타임라인 새로고침' });
           await reloadTab(w.tabId);
-          await probeSettled(w.tabId);
+          // 새로고침해도 페이지가 글 화면이 아니면 타임라인 자체가 안 열린 것이다
+          // (예산 소진 뒤의 "Something went wrong"). 이걸 "더 지울 글이 없음"으로
+          // 읽으면 밤새 돌 작업이 조용히 끝나버린다 (ADR-0014)
+          if ((await probeSettled(w.tabId)).pageKind === 'unknown') {
+            emptyStreak = 0; // 글이 없는 게 아니라 화면이 없는 것이다
+            pageFailStreak += 1;
+            const backoff = pageBackoffMs(pageFailStreak);
+            onEvent({
+              type: 'waiting',
+              reason: `타임라인을 열지 못했습니다 (${pageFailStreak}회 연속) — 물러나 대기`,
+              untilMs: Date.now() + backoff,
+            });
+            onTimeline = false;
+            await sleep(backoff, controls);
+            continue;
+          }
           scrolledAway = false;
         } else {
           onEvent({ type: 'searching', note: '더 불러오는 중' });
@@ -241,11 +260,22 @@ export async function runSweep(
       onTimeline = false;
     }
 
+    // 페이지가 안 열린 건 이 글의 잘못이 아니다. 재시도 횟수도 깎지 않고, skip에도
+    // 넣지 않는다 — 아래 백오프로 물러났다가 같은 글을 다시 집는다 (ADR-0014)
+    const signal: Signal | null = 'signal' in result ? result.signal : null;
+    const pageLevel = isPageLevelSignal(signal);
+
     if (targetId !== null) {
       const removed = result.kind === 'ok' || result.kind === 'gone';
-      const signal: Signal | null = 'signal' in result ? result.signal : null;
-      deleted = await upsertJobItem(ctx.job.id, targetId, itemStatusOf(result), signal, removed);
-      if (!removed) skip.add(targetId);
+      deleted = await upsertJobItem(
+        ctx.job.id,
+        targetId,
+        itemStatusOf(result),
+        signal,
+        removed,
+        !pageLevel,
+      );
+      if (!removed && !pageLevel) skip.add(targetId);
 
       const event: BreakerEvent = takeRateLimit()
         ? { type: 'rate_limit', resetMs: budget.windowSec * 1000 }
@@ -272,6 +302,21 @@ export async function runSweep(
           onTimeline = false;
         }
       }
+    }
+
+    // 페이지 장애가 이어지면 멈추지 않고 물러나 기다린다. 그냥 건너뛰면 창 예산이
+    // 바닥난 동안 남은 글을 전부 실패로 소진한다 (ADR-0014)
+    pageFailStreak = pageLevel ? pageFailStreak + 1 : 0;
+    if (pageFailStreak > 0) {
+      const backoff = pageBackoffMs(pageFailStreak);
+      onEvent({
+        type: 'waiting',
+        reason: `페이지를 열지 못했습니다 (${pageFailStreak}회 연속) — 물러나 대기`,
+        untilMs: Date.now() + backoff,
+      });
+      onTimeline = false; // 다시 열 때 타임라인부터 새로 연다
+      await sleep(backoff, controls);
+      continue;
     }
 
     // 간격은 시작 시각 간 간격(cadence). 탐색·클릭에 쓴 시간을 뺀다

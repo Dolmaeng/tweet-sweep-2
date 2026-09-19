@@ -204,6 +204,8 @@ export async function upsertJobItem(
   status: JobItemStatus,
   signal: Signal | null,
   removed: boolean,
+  /** false면 attempts를 올리지 않는다. 페이지 장애는 그 글의 잘못이 아니다 (ADR-0014) */
+  countAttempt = true,
 ): Promise<number> {
   const db = await getDb();
   const tx = db.transaction(['jobItems', 'jobs'], 'readwrite');
@@ -214,7 +216,7 @@ export async function upsertJobItem(
     jobId,
     postId,
     status,
-    attempts: (existing?.attempts ?? 0) + 1,
+    attempts: (existing?.attempts ?? 0) + (countAttempt ? 1 : 0),
     lastSignal: signal,
     doneAt: new Date().toISOString(),
   });
@@ -276,6 +278,8 @@ export async function markItem(
   status: JobItemStatus,
   signal: Signal | null,
   removed: boolean,
+  /** false면 attempts를 올리지 않는다. 페이지 장애는 그 글의 잘못이 아니다 (ADR-0014) */
+  countAttempt = true,
 ): Promise<number> {
   const db = await getDb();
   const tx = db.transaction(['jobItems', 'jobs'], 'readwrite');
@@ -287,7 +291,7 @@ export async function markItem(
       ...item,
       status,
       lastSignal: signal,
-      attempts: item.attempts + 1,
+      attempts: item.attempts + (countAttempt ? 1 : 0),
       doneAt: new Date().toISOString(),
     };
     await items.put(updated);

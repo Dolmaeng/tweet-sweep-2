@@ -122,7 +122,10 @@ export async function deletePost(
   if (kind === 'not_found') return { kind: 'gone' };
   if (kind === 'login') return { kind: 'blocked', signal: 'auth_redirect' };
   if (kind === 'locked') return { kind: 'blocked', signal: 'account_locked' };
-  if (kind !== 'tweet') return { kind: 'error', signal: 'dom_changed', detail: `page:${kind}` };
+  // 글이 아니라 페이지가 안 열린 것이다. 셀렉터가 바뀐 것(dom_changed)과 구별해야
+  // 이 글의 재시도 횟수를 깎지 않고 물러나 기다릴 수 있다 (ADR-0014)
+  if (kind !== 'tweet')
+    return { kind: 'error', signal: 'page_unavailable', detail: `page:${kind}` };
 
   const article = await waitFor(
     () => findTargetArticle(doc, postId),

@@ -197,6 +197,17 @@ describe('deletePost', () => {
     expect(blocked).toEqual({ kind: 'blocked', signal: 'auth_redirect' });
   });
 
+  it('글 화면이 아니면 page_unavailable — 그 글의 잘못이 아니다 (ADR-0014)', async () => {
+    // 예산 소진 뒤 X가 내보내는 "Something went wrong" 화면: article도 error-detail도 없다
+    const doc = setBody('<div>Something went wrong. Try reloading.</div>');
+    const result = await deletePost(doc, '/u/status/1', '1', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({
+      kind: 'error',
+      signal: 'page_unavailable',
+      detail: 'page:unknown',
+    });
+  });
+
   it('reports the failing step with DOM counts when the caret is missing', async () => {
     const doc = setBody('<article data-testid="tweet"><a href="/u/status/1"></a></article>');
     const fast = { labels: ['삭제'], timeouts: { element: 20, confirm: 20 } };

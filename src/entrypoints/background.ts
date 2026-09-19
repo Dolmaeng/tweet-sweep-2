@@ -1,7 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { browser } from 'wxt/browser';
 import { parseRateLimit } from '../core/ratelimit';
-import { isGraphqlDelete } from '../core/xurl';
+import { graphqlOperation } from '../core/xurl';
 import type { NetEvent } from '../messaging/protocol';
 
 // 서비스 워커는 최소 역할만 맡는다(ADR-0004): 대시보드 열기 + 삭제 응답 헤더 관측.
@@ -10,14 +10,17 @@ export default defineBackground(() => {
     void openDashboard();
   });
 
-  // DeleteTweet 응답에서 rate-limit 예산을 읽어 대시보드로 보낸다 (ADR-0007).
+  // 모든 GraphQL 응답에서 rate-limit 예산을 읽어 대시보드로 보낸다 (ADR-0007, ADR-0014).
+  // 삭제만 보면 안 된다: 글을 한 건 지우려면 그 페이지를 한 번 읽어야 하고,
+  // 읽기 버킷이 먼저 바닥나면 "Something went wrong" 화면이 뜬다(page:unknown).
   browser.webRequest.onCompleted.addListener(
     (details) => {
-      if (!isGraphqlDelete(details.url)) return;
+      const op = graphqlOperation(details.url);
+      if (op === null) return;
       const at = new Date().toISOString();
-      if (details.statusCode === 429) broadcast({ type: 'RATE_LIMIT', at });
+      if (details.statusCode === 429) broadcast({ type: 'RATE_LIMIT', op, at });
       const rl = parseRateLimit(details.responseHeaders ?? []);
-      if (rl) broadcast({ type: 'BUDGET', ...rl, at });
+      if (rl) broadcast({ type: 'BUDGET', op, ...rl, at });
     },
     { urls: ['https://x.com/i/api/graphql/*'] },
     ['responseHeaders'],

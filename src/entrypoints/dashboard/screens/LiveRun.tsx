@@ -165,8 +165,8 @@ export function LiveRun({ account, job, settings, onBack }: Props) {
 
       <p className="muted small">
         {view.remaining != null
-          ? `X 예산: 한도 ${view.limit}, 잔여 ${view.remaining}${view.resetSec != null ? `, 리셋 ${view.resetSec}s` : ''}`
-          : `X 예산 미관측(가정 한도 ${view.limit}). 첫 삭제 후 실측값으로 갱신됩니다`}
+          ? `X 예산(${view.op ?? '?'}): 한도 ${view.limit}, 잔여 ${view.remaining}${view.resetSec != null ? `, 리셋 ${view.resetSec}s` : ''}`
+          : `X 예산 미관측(가정 한도 ${view.limit}). 관측 전에는 한도 감시가 작동하지 않습니다`}
       </p>
 
       <h3>실시간 기록</h3>

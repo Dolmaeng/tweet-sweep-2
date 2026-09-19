@@ -31,5 +31,6 @@ export type ContentReply =
 
 /** 서비스 워커 → 대시보드 (runtime 브로드캐스트, webRequest 관측) */
 export type NetEvent =
-  | { type: 'BUDGET'; limit: number; remaining: number; resetSec: number; at: string }
-  | { type: 'RATE_LIMIT'; at: string };
+  // op = GraphQL 연산명. 삭제와 읽기는 한도 버킷이 달라 따로 센다 (2026-09-19)
+  | { type: 'BUDGET'; op: string; limit: number; remaining: number; resetSec: number; at: string }
+  | { type: 'RATE_LIMIT'; op: string; at: string };
