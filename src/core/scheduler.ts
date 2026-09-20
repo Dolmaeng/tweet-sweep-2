@@ -21,6 +21,8 @@ export interface RunSnapshot {
   budget: RateBudget;
   /** 관측된 잔여(x-rate-limit-remaining) 또는 null */
   remaining: number | null;
+  /** 관측한 창 리셋 시각(ms epoch). 모르면 null → 창 길이를 통째로 기다린다 */
+  resetAtMs: number | null;
   preset: PresetSpec;
   activeStartHour: number;
   activeEndHour: number;
@@ -52,9 +54,13 @@ export function decide(snap: RunSnapshot, now: number): Command {
 
   const u = warmupUtil(snap.preset, snap.deletedSoFar);
   if (snap.remaining !== null && shouldWaitForReset(snap.remaining, snap.budget.limit, u)) {
+    // 헤더가 알려준 리셋 시각까지만 기다린다. 창 길이(900초)를 통째로 더하면
+    // 이미 흘러간 시간을 두 번 세어, "리셋 562초"를 보고 15분을 잔다 (ADR-0015).
+    const until = snap.resetAtMs ?? now + snap.budget.windowSec * 1000;
     return {
       type: 'wait',
-      untilMs: now + snap.budget.windowSec * 1000,
+      // 리셋 시각이 이미 지났으면 다음 회차에 다시 판단한다. 그때는 버킷이 만료돼 잔여가 null이다
+      untilMs: Math.max(until, now + 1_000),
       reason: '예산 소진 — 창 리셋 대기',
     };
   }

@@ -1,5 +1,6 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { browser } from 'wxt/browser';
+import { isPacedOperation } from '../core/budget-buckets';
 import { parseRateLimit } from '../core/ratelimit';
 import { graphqlOperation } from '../core/xurl';
 import type { NetEvent } from '../messaging/protocol';
@@ -10,13 +11,14 @@ export default defineBackground(() => {
     void openDashboard();
   });
 
-  // 모든 GraphQL 응답에서 rate-limit 예산을 읽어 대시보드로 보낸다 (ADR-0007, ADR-0014).
+  // 삭제 경로 GraphQL 응답에서 rate-limit 예산을 읽어 대시보드로 보낸다 (ADR-0007, ADR-0014).
   // 삭제만 보면 안 된다: 글을 한 건 지우려면 그 페이지를 한 번 읽어야 하고,
   // 읽기 버킷이 먼저 바닥나면 "Something went wrong" 화면이 뜬다(page:unknown).
+  // 반대로 삭제와 무관한 연산까지 보면 그쪽 버킷이 삭제를 세운다 — 그래서 걸러낸다(ADR-0015).
   browser.webRequest.onCompleted.addListener(
     (details) => {
       const op = graphqlOperation(details.url);
-      if (op === null) return;
+      if (op === null || !isPacedOperation(op)) return;
       const at = new Date().toISOString();
       if (details.statusCode === 429) broadcast({ type: 'RATE_LIMIT', op, at });
       const rl = parseRateLimit(details.responseHeaders ?? []);

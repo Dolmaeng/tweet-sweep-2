@@ -98,7 +98,7 @@ export async function runSweep(
       return;
     }
 
-    const { budget, remaining, takeRateLimit } = budgetSource();
+    const { budget, remaining, resetAtMs, takeRateLimit } = budgetSource();
     const snap: RunSnapshot = {
       // 남은 수를 알 수 없다. 타임라인이 비었을 때만 완료로 판정한다(아래 nextRecovery)
       pending: 1,
@@ -106,6 +106,7 @@ export async function runSweep(
       breaker,
       budget,
       remaining,
+      resetAtMs,
       preset,
       activeStartHour: ctx.activeStartHour,
       activeEndHour: ctx.activeEndHour,

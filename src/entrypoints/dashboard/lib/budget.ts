@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { tightestBucket, type Bucket } from '../../../core/budget-buckets';
+import { resetAtMs, tightestBucket, type Bucket } from '../../../core/budget-buckets';
 import { DEFAULT_BUDGET, type RateBudget } from '../../../core/pacing';
 import type { BudgetSnapshot } from '../../../platform/runner';
 import type { NetEvent } from '../../../messaging/protocol';
@@ -82,6 +82,8 @@ export function useBudget(): { view: BudgetView; source: () => BudgetSnapshot } 
     return {
       budget,
       remaining: worst?.remaining ?? null,
+      // 창 길이 가정(900초)이 아니라 헤더가 말한 리셋 시각을 넘긴다 (ADR-0015)
+      resetAtMs: worst === null ? null : resetAtMs(worst),
       takeRateLimit: () => {
         const hit = rateLimit.current;
         rateLimit.current = false;

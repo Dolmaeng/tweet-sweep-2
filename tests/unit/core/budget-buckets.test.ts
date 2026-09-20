@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BUCKET_TTL_MS,
   freshBuckets,
+  isPacedOperation,
+  resetAtMs,
   tightestBucket,
   type Bucket,
 } from '../../../src/core/budget-buckets';
@@ -34,6 +36,27 @@ describe('tightestBucket', () => {
     const worst = tightestBucket(buckets, NOW);
     expect(worst?.op).toBe('TweetDetail');
     expect(worst?.remaining).toBe(0);
+  });
+});
+
+describe('isPacedOperation', () => {
+  it('삭제 경로 연산만 실행을 막는다', () => {
+    expect(isPacedOperation('DeleteTweet')).toBe(true);
+    expect(isPacedOperation('TweetDetail')).toBe(true);
+    expect(isPacedOperation('UserTweetsAndReplies')).toBe(true);
+  });
+
+  it('삭제와 무관한 연산은 한도가 좁아도 무시한다 (2026-09-20 CreatorStudio 오진)', () => {
+    // 잔여 13/50이라며 삭제를 15분 세웠던 연산. 우리가 쓴 예산이 아니다
+    expect(isPacedOperation('CreatorStudioTabBarItemQuery')).toBe(false);
+    expect(isPacedOperation('HomeTimeline')).toBe(false);
+    expect(isPacedOperation('DMInboxTimeline')).toBe(false);
+  });
+});
+
+describe('resetAtMs', () => {
+  it('관측 시각 기준 잔여를 절대 시각으로 바꾼다', () => {
+    expect(resetAtMs(bucket({ op: 'DeleteTweet', atMs: NOW, resetSec: 562 }))).toBe(NOW + 562_000);
   });
 });
 

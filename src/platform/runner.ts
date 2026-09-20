@@ -33,6 +33,8 @@ export interface RunControls {
 export interface BudgetSnapshot {
   budget: RateBudget;
   remaining: number | null;
+  /** 관측한 창 리셋 시각(ms epoch). 모르면 null (ADR-0015) */
+  resetAtMs: number | null;
   /** 지난 호출 이후 429가 있었으면 true(소비). */
   takeRateLimit(): boolean;
 }
@@ -91,13 +93,14 @@ export async function runJob(
     }
 
     const pending = await pendingCount(ctx.job.id);
-    const { budget, remaining, takeRateLimit } = budgetSource();
+    const { budget, remaining, resetAtMs, takeRateLimit } = budgetSource();
     const snap: RunSnapshot = {
       pending,
       deletedSoFar,
       breaker,
       budget,
       remaining,
+      resetAtMs,
       preset,
       activeStartHour: ctx.activeStartHour,
       activeEndHour: ctx.activeEndHour,
