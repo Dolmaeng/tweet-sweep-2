@@ -203,9 +203,13 @@ export function SweepRun({ settings, onBack }: Props) {
       <h2>아카이브 없이 삭제 — 스윕 모드</h2>
 
       <div className="notice">
-        <b>되돌릴 수 없습니다.</b> 이 모드는 목록도 미리보기도 없이, 로그인한 계정의 원글과 답글을
-        최신 글부터 {isFilterActive(filter, 'sweep') ? '필터에 걸리지 않는 것만' : '전부'} 지웁니다.
-        리포스트는 건드리지 않고, 고정한 글은 맨 마지막에 지웁니다.
+        <b>되돌릴 수 없습니다.</b> 이 모드는 목록도 미리보기도 없이, 프로필{' '}
+        <b>{filter.mention === 'only' ? '"답글" 탭' : '"전체" 탭'}</b>의 글을 최신 글부터{' '}
+        {isFilterActive(filter, 'sweep') ? '필터에 걸리지 않는 것만' : '전부'} 지웁니다.
+        {filter.mention === 'only'
+          ? ' 답글만 노리는 필터라 답글 탭을 훑습니다.'
+          : ' 원글·답글·미디어는 삭제하고, 내가 누른 리포스트는 재게시를 취소합니다.'}{' '}
+        고정한 글은 맨 마지막에 지웁니다.
       </div>
 
       {checkError && (

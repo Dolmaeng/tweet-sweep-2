@@ -7,6 +7,7 @@
 //  - 새 조건은 KeepFlag + KEEP_TESTS_* + CAPABLE_FLAGS에 한 줄씩 더하면 된다.
 import type { Post, PostKind } from './models';
 import type { TimelineItem } from './timeline';
+import type { SweepTab } from './xurl';
 
 export type Mode = 'archive' | 'sweep';
 
@@ -256,6 +257,19 @@ export function isMentionItem(item: TimelineItem): boolean {
 
 export function isMentionPost(post: TargetPost): boolean {
   return post.inReplyToId !== null || post.text.trimStart().startsWith('@');
+}
+
+/**
+ * 스윕이 훑을 프로필 탭 (ADR-0016).
+ *
+ * 기본은 "전체" 탭이다. 원글·미디어·리포스트가 다 거기 있고, 답글 탭에는 **답글밖에 없다**.
+ * 답글만 노리는 필터(멘션만 포함)일 때만 답글 탭으로 간다 — 그때는 전체 탭을 훑어봐야
+ * 대부분을 보존 판정으로 버리게 되므로, 답글만 모인 타임라인이 훨씬 빠르다.
+ *
+ * '멘션 제외'는 답글이 아닌 글을 지우겠다는 뜻이므로 전체 탭이 맞다.
+ */
+export function sweepTabOf(f: KeepFilter): SweepTab {
+  return f.mention === 'only' ? 'with_replies' : 'all';
 }
 
 /** true면 스윕 삭제 대상에서 뺀다 */

@@ -11,14 +11,15 @@ import { isPageLevelSignal } from '../core/models';
 import type { ExecutionResult, Job, Signal } from '../core/models';
 import { PRESETS, withCustomInterval } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
-import { isFilterActive, isKeptSweep, type KeepFilter } from '../core/keep-filter';
-import { nextRecovery, pickSweepTarget } from '../core/timeline';
-import { withRepliesUrl } from '../core/xurl';
+import { isFilterActive, isKeptSweep, sweepTabOf, type KeepFilter } from '../core/keep-filter';
+import { nextRecovery, pickSweepTarget, sweepActionOf } from '../core/timeline';
+import { sweepTabPath, sweepTimelineUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
 import { appendAudit, itemStatusOf, upsertJobItem, setJobStatus } from './db';
 import type { BudgetSnapshot, RunControls } from './runner';
 import {
   deleteOnTab,
+  ensureTabOnTab,
   ensureWorker,
   navigate,
   probeSettled,
@@ -26,6 +27,7 @@ import {
   scanOnTab,
   scrollOnTab,
   sessionUsername,
+  unrepostOnTab,
   type Worker,
 } from './worker-tab';
 
@@ -87,6 +89,13 @@ export async function runSweep(
   /** 이번 실행에서 한 번이라도 스캔한 글. 스크롤이 새 카드를 불러왔는지 판정한다 */
   const seen = new Set<string>();
   const filtered = isFilterActive(ctx.filter, 'sweep');
+  /**
+   * 훑을 탭. 답글만 노리는 필터가 아니면 "전체"다 — 원글·미디어·리포스트가 거기 다 있고,
+   * 답글 탭에는 답글밖에 없다 (ADR-0016)
+   */
+  const tab = sweepTabOf(ctx.filter);
+  /** 정렬(최신순) 확인은 실행당 한 번. 메뉴를 여닫는 동작이라 루프 안에서 반복하지 않는다 */
+  let sortChecked = false;
 
   await setJobStatus(ctx.job.id, 'running');
   onEvent({ type: 'running' });
@@ -141,7 +150,7 @@ export async function runSweep(
         onTimeline = false;
       }
       if (!onTimeline) {
-        await navigate(w.tabId, withRepliesUrl(ctx.username));
+        await navigate(w.tabId, sweepTimelineUrl(ctx.username, tab));
         const probe = await probeSettled(w.tabId);
         if (probe.pageKind === 'login') {
           await setJobStatus(ctx.job.id, 'halted');
@@ -164,6 +173,25 @@ export async function runSweep(
           });
           return;
         }
+        // 주소만으로 대개 맞지만, 안 맞으면 탭 줄·드롭다운을 눌러 맞춘다 (ADR-0016)
+        const tabState = await ensureTabOnTab(w.tabId, tab, !sortChecked);
+        sortChecked = true;
+        if (tabState.sortChanged) onEvent({ type: 'searching', note: '정렬을 최신순으로 맞춤' });
+        // 주소가 그 탭이 아니면 **엉뚱한 타임라인을 지우게 된다.** 이건 계속하면 안 된다
+        if (tabState.path !== sweepTabPath(ctx.username, tab)) {
+          await setJobStatus(ctx.job.id, 'halted');
+          onEvent({
+            type: 'ended',
+            reason: `타임라인 탭을 열지 못했습니다 (${tabState.path} / ${tabState.detail})`,
+            completed: false,
+          });
+          return;
+        }
+        // 주소는 맞는데 탭 줄만 못 읽은 경우는 계속한다. 주소가 곧 타임라인이다
+        if (!tabState.ok) {
+          onEvent({ type: 'searching', note: `탭 줄을 확인하지 못함 (${tabState.detail})` });
+        }
+
         onTimeline = true;
         scrolledAway = false;
       }
@@ -242,8 +270,13 @@ export async function runSweep(
 
       emptyStreak = 0;
       targetId = target.postId;
-      targetText = target.text;
-      result = await deleteOnTab(w.tabId, target.postId, DEFAULT_UI_CONFIG);
+      // 리포스트는 '삭제'가 아니라 '재게시 취소'다. 기록에도 그렇게 남긴다
+      const action = sweepActionOf(target);
+      targetText = action === 'unrepost' ? `[재게시 취소] ${target.text}` : target.text;
+      result =
+        action === 'unrepost'
+          ? await unrepostOnTab(w.tabId, target.postId, DEFAULT_UI_CONFIG)
+          : await deleteOnTab(w.tabId, target.postId, DEFAULT_UI_CONFIG);
       await appendAudit({
         ts: new Date().toISOString(),
         jobId: ctx.job.id,
@@ -252,7 +285,7 @@ export async function runSweep(
         result: result.kind,
         signal: 'signal' in result ? result.signal : null,
         durationMs: Date.now() - startedAt,
-        text: target.text,
+        text: targetText,
         createdAt: target.createdAt,
       });
     } catch (e) {

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { graphqlOperation, isGraphqlDelete, profileUrl, statusUrl } from '../../../src/core/xurl';
+import {
+  allTabUrl,
+  graphqlOperation,
+  isGraphqlDelete,
+  profileUrl,
+  statusUrl,
+  sweepTabPath,
+  sweepTimelineUrl,
+  withRepliesUrl,
+} from '../../../src/core/xurl';
 
 describe('xurl', () => {
   it('builds status and profile URLs', () => {
@@ -21,5 +30,24 @@ describe('xurl', () => {
       'UserTweetsAndReplies',
     );
     expect(graphqlOperation('https://x.com/home')).toBeNull();
+  });
+});
+
+describe('스윕 타임라인 주소 (ADR-0016)', () => {
+  it('기본은 전체 탭 — 답글 탭이 아니다', () => {
+    expect(allTabUrl('gujik_man')).toBe('https://x.com/gujik_man/all');
+    expect(sweepTimelineUrl('gujik_man', 'all')).toBe('https://x.com/gujik_man/all');
+  });
+
+  it('답글만 노릴 때만 답글 탭', () => {
+    expect(sweepTimelineUrl('gujik_man', 'with_replies')).toBe(
+      'https://x.com/gujik_man/with_replies',
+    );
+    expect(withRepliesUrl('gujik_man')).toBe('https://x.com/gujik_man/with_replies');
+  });
+
+  it('탭이 선택됐을 때의 경로 — 주소가 맞는지 검사하는 근거', () => {
+    expect(sweepTabPath('gujik_man', 'all')).toBe('/gujik_man/all');
+    expect(sweepTabPath('gujik_man', 'with_replies')).toBe('/gujik_man/with_replies');
   });
 });

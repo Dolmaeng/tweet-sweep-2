@@ -39,16 +39,31 @@ export function sameHandle(a: string, b: string): boolean {
   return a.replace(/^@/, '').toLowerCase() === b.replace(/^@/, '').toLowerCase();
 }
 
-/** 내가 쓴 글이고 리포스트가 아니며 이미 시도해 실패한 적 없는 카드 */
+/** 카드를 치우는 방법. 리포스트는 삭제가 아니라 재게시 취소다 (ADR-0016) */
+export type SweepAction = 'delete' | 'unrepost';
+
+export function sweepActionOf(item: TimelineItem): SweepAction {
+  return item.repost ? 'unrepost' : 'delete';
+}
+
+/**
+ * 치울 수 있는 카드인가. 이미 시도해 실패한 것은 뺀다.
+ *
+ * 리포스트 카드는 **남의 글**이다. permalink의 handle도 원작성자라 handle 비교가 통하지 않는다.
+ * 대신 내가 눌렀다는 증거(unretweet 버튼 = retweeted)를 본다. 그 버튼이 있으면 재게시 취소가
+ * 내 행동만 되돌리므로 남의 글에는 아무 일도 일어나지 않는다. 증거가 없으면 손대지 않는다.
+ *
+ * 리포스트가 아닌 카드는 종래대로 handle이 나와 같아야 한다. 이 검사가 남의 글을 지우지 않는
+ * 마지막 방어선이다 (ADR-0009).
+ */
 export function isSweepCandidate(
   item: TimelineItem,
   username: string,
   skip: ReadonlySet<string>,
 ): boolean {
-  if (item.repost) return false;
-  if (!sameHandle(item.handle, username)) return false;
   if (skip.has(item.postId)) return false;
-  return true;
+  if (item.repost) return item.retweeted;
+  return sameHandle(item.handle, username);
 }
 
 /**

@@ -37,12 +37,20 @@ export function detectPageKind(doc: Document, pathname: string): PageKind {
  */
 export function findTargetArticle(doc: Document, postId: string): Element | null {
   const articles = Array.from(doc.querySelectorAll('article[data-testid="tweet"]'));
+  return findCardArticle(doc, postId) ?? (articles.length === 1 ? articles[0]! : null);
+}
+
+/**
+ * 링크가 그 글을 가리키는 카드만. "하나뿐이면 허용"이 없다.
+ * 타임라인에는 카드가 여럿이므로 그 완화가 다른 카드를 집는 사고가 된다 (ADR-0016).
+ */
+export function findCardArticle(doc: Document, postId: string): Element | null {
   const re = new RegExp(`/status/${postId}(?:[/?#]|$)`);
-  for (const a of articles) {
+  for (const a of doc.querySelectorAll('article[data-testid="tweet"]')) {
     const links = Array.from(a.querySelectorAll<HTMLAnchorElement>('a[href]'));
     if (links.some((l) => re.test(l.getAttribute('href') ?? ''))) return a;
   }
-  return articles.length === 1 ? articles[0]! : null;
+  return null;
 }
 
 export function findCaret(scope: ParentNode): HTMLElement | null {
@@ -86,7 +94,7 @@ export function findConfirm(doc: Document): HTMLElement | null {
   return doc.querySelector('[data-testid="confirmationSheetConfirm"]');
 }
 
-async function waitFor<T>(
+export async function waitFor<T>(
   get: () => T | null,
   timeoutMs: number,
   sleep: (ms: number) => Promise<void>,
@@ -155,6 +163,66 @@ export async function deletePost(
 
   const confirm = await waitFor(() => findConfirm(doc), config.timeouts.confirm, sleep);
   if (!confirm) return { kind: 'error', signal: 'dom_changed', detail: 'confirm' };
+  confirm.click();
+
+  return { kind: 'ok' };
+}
+
+// ── 재게시 취소 (ADR-0016) ───────────────────────────────────────────────────
+// 2026-09-23 라이브 확인: 내가 재게시한 카드의 재게시 버튼은 data-testid="unretweet"
+// (aria-label "801 재게시. 재게시함"). 누르면 메뉴가 열리고 그 안의
+// data-testid="unretweetConfirm"("재게시 취소") 한 번으로 끝난다. 확인 시트는 없다.
+
+/** 내가 누른 재게시임을 나타내는 버튼. 안 누른 카드는 data-testid="retweet" */
+export const UNRETWEET_SELECTOR = '[data-testid="unretweet"]';
+export const UNRETWEET_CONFIRM_SELECTOR = '[data-testid="unretweetConfirm"]';
+
+export function findUnretweetButton(scope: ParentNode): HTMLElement | null {
+  return scope.querySelector<HTMLElement>(UNRETWEET_SELECTOR);
+}
+
+export function findUnretweetConfirm(doc: Document): HTMLElement | null {
+  return doc.querySelector<HTMLElement>(UNRETWEET_CONFIRM_SELECTOR);
+}
+
+/**
+ * 리포스트 한 건 취소: 카드 찾기 → 재게시 버튼 → "재게시 취소".
+ *
+ * 삭제와 달리 **caret 메뉴를 열지 않는다.** 리포스트 카드의 caret은 원작성자에 대한
+ * 메뉴(언팔로우·차단·신고)라, 거기서 무언가를 누르면 내 의도와 전혀 다른 일이 벌어진다
+ * (2026-09-17 라이브 사고). 카드도 링크가 일치하는 것만 쓴다 — 타임라인에는 카드가 여럿이라
+ * "하나뿐이면 허용"이 남의 재게시를 취소하는 길이 된다.
+ */
+export async function undoRepost(
+  doc: Document,
+  pathname: string,
+  postId: string,
+  config: UiClickConfig,
+  sleep: (ms: number) => Promise<void> = sleepMs,
+): Promise<ExecutionResult> {
+  const kind = detectPageKind(doc, pathname);
+  if (kind === 'not_found') return { kind: 'gone' };
+  if (kind === 'login') return { kind: 'blocked', signal: 'auth_redirect' };
+  if (kind === 'locked') return { kind: 'blocked', signal: 'account_locked' };
+  if (kind !== 'tweet')
+    return { kind: 'error', signal: 'page_unavailable', detail: `page:${kind}` };
+
+  const article = await waitFor(() => findCardArticle(doc, postId), config.timeouts.element, sleep);
+  if (!article) return { kind: 'error', signal: 'dom_changed', detail: `card(${domCounts(doc)})` };
+
+  const button = findUnretweetButton(article);
+  if (!button) {
+    // 이미 취소됐으면 재게시 버튼이 "retweet" 상태로 돌아가 있다. 치울 게 없으니 gone이다.
+    // 둘 다 없으면 카드 구조가 바뀐 것이라 손대지 않는다.
+    return article.querySelector('[data-testid="retweet"]')
+      ? { kind: 'gone' }
+      : { kind: 'error', signal: 'dom_changed', detail: 'unretweet-button' };
+  }
+  button.click();
+
+  const confirm = await waitFor(() => findUnretweetConfirm(doc), config.timeouts.confirm, sleep);
+  if (!confirm)
+    return { kind: 'error', signal: 'dom_changed', detail: `unretweetConfirm[${menuLabels(doc)}]` };
   confirm.click();
 
   return { kind: 'ok' };

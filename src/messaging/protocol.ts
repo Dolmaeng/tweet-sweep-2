@@ -3,6 +3,7 @@
 import type { ExecutionResult } from '../core/models';
 import type { TimelineItem } from '../core/timeline';
 import type { PageKind, UiClickConfig } from '../executors/types';
+import type { SweepTab } from '../core/xurl';
 
 export interface PageProbe {
   pageKind: PageKind;
@@ -17,8 +18,12 @@ export type ScrollTo = 'top' | 'more';
 export type ContentCommand =
   | { type: 'PROBE_PAGE' }
   | { type: 'DELETE_POST'; postId: string; config: UiClickConfig }
+  /** 리포스트는 삭제가 아니라 재게시 취소다 (ADR-0016) */
+  | { type: 'UNDO_REPOST'; postId: string; config: UiClickConfig }
   | { type: 'SESSION_INFO' }
   | { type: 'SCAN_TIMELINE' }
+  /** 프로필 타임라인 탭을 맞춘다. sort는 실행당 한 번만 true (ADR-0016) */
+  | { type: 'ENSURE_TAB'; tab: SweepTab; sort: boolean }
   | { type: 'SCROLL'; to: ScrollTo };
 
 /** 콘텐츠 스크립트 → 대시보드 (sendMessage 응답) */
@@ -27,7 +32,19 @@ export type ContentReply =
   | { type: 'DELETE'; result: ExecutionResult }
   | { type: 'SESSION'; username: string | null }
   | { type: 'SCAN'; items: TimelineItem[] }
+  | { type: 'TAB'; tab: TabState }
   | { type: 'SCROLLED' };
+
+/** 탭을 맞춘 결과. path가 사실상의 판정 근거이고 나머지는 진단이다 */
+export interface TabState {
+  /** 맞춰졌는가(탭 줄 기준) */
+  ok: boolean;
+  /** 맞춘 뒤의 location.pathname */
+  path: string;
+  /** 정렬을 최신순으로 바꿨는가 */
+  sortChanged: boolean;
+  detail: string;
+}
 
 /** 서비스 워커 → 대시보드 (runtime 브로드캐스트, webRequest 관측) */
 export type NetEvent =

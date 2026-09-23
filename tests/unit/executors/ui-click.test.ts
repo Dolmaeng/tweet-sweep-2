@@ -8,6 +8,7 @@ import {
   findConfirm,
   findDeleteMenuItem,
   findTargetArticle,
+  undoRepost,
 } from '../../../src/executors/ui-click';
 
 const noSleep = () => Promise.resolve();
@@ -217,5 +218,85 @@ describe('deletePost', () => {
       expect(result.signal).toBe('dom_changed');
       expect(result.detail).toMatch(/^caret\(articles=1,carets=0,menuitems=0\)$/);
     }
+  });
+});
+
+// ── 재게시 취소 (ADR-0016) ───────────────────────────────────────────────────
+
+/** 없는 것을 기다리는 경우는 대기 없이 바로 실패시킨다 */
+const NO_WAIT = { ...DEFAULT_UI_CONFIG, timeouts: { element: 0, confirm: 0 } };
+
+const TIMELINE = `
+  <article data-testid="tweet">
+    <a href="/someone/status/111"><time datetime="2024-01-01"></time></a>
+    <button data-testid="caret"></button>
+    <button data-testid="unretweet" aria-label="801 재게시. 재게시함"></button>
+  </article>
+  <article data-testid="tweet">
+    <a href="/gujik_man/status/222"><time datetime="2024-01-02"></time></a>
+    <button data-testid="caret"></button>
+    <button data-testid="retweet"></button>
+  </article>
+  <div id="sheet"></div>`;
+
+describe('undoRepost', () => {
+  it('그 카드의 재게시 버튼을 눌러 "재게시 취소"까지 간다', async () => {
+    const doc = setBody(TIMELINE);
+    const button = doc.querySelector('[data-testid="unretweet"]')!;
+    let confirmed = false;
+    button.addEventListener('click', () => {
+      doc.querySelector('#sheet')!.innerHTML =
+        '<div role="menu"><div role="menuitem" data-testid="unretweetConfirm">재게시 취소</div><div role="menuitem">인용하세요</div></div>';
+      doc
+        .querySelector('[data-testid="unretweetConfirm"]')!
+        .addEventListener('click', () => (confirmed = true));
+    });
+
+    const result = await undoRepost(doc, '/gujik_man/all', '111', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({ kind: 'ok' });
+    expect(confirmed).toBe(true);
+  });
+
+  it('caret 메뉴를 절대 열지 않는다 — 리포스트의 caret은 원작성자 메뉴다', async () => {
+    const doc = setBody(TIMELINE);
+    let caretClicked = false;
+    for (const c of doc.querySelectorAll('[data-testid="caret"]')) {
+      c.addEventListener('click', () => (caretClicked = true));
+    }
+    doc.querySelector('[data-testid="unretweet"]')!.addEventListener('click', () => {
+      doc.querySelector('#sheet')!.innerHTML =
+        '<div role="menuitem" data-testid="unretweetConfirm">재게시 취소</div>';
+    });
+    await undoRepost(doc, '/gujik_man/all', '111', DEFAULT_UI_CONFIG, noSleep);
+    expect(caretClicked).toBe(false);
+  });
+
+  it('링크가 일치하는 카드만 만진다 — 옆 카드의 재게시를 취소하지 않는다', async () => {
+    const doc = setBody(TIMELINE);
+    let wrongCard = false;
+    doc
+      .querySelector('[data-testid="unretweet"]')!
+      .addEventListener('click', () => (wrongCard = true));
+    // 333은 화면에 없다. 카드가 여럿이므로 "하나뿐이면 허용"도 통하지 않아야 한다
+    const result = await undoRepost(doc, '/gujik_man/all', '333', NO_WAIT, noSleep);
+    expect(result).toMatchObject({ kind: 'error', signal: 'dom_changed' });
+    expect(wrongCard).toBe(false);
+  });
+
+  it('이미 취소된 카드는 gone으로 본다', async () => {
+    const doc = setBody(TIMELINE);
+    const result = await undoRepost(doc, '/gujik_man/all', '222', DEFAULT_UI_CONFIG, noSleep);
+    expect(result).toEqual({ kind: 'gone' });
+  });
+
+  it('페이지가 안 열렸으면 page_unavailable — 이 글의 잘못이 아니다', async () => {
+    const result = await undoRepost(
+      setBody('<div></div>'),
+      '/gujik_man/all',
+      '111',
+      DEFAULT_UI_CONFIG,
+      noSleep,
+    );
+    expect(result).toMatchObject({ kind: 'error', signal: 'page_unavailable' });
   });
 });

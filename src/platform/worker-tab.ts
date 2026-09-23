@@ -4,7 +4,14 @@ import { browser } from 'wxt/browser';
 import type { ExecutionResult } from '../core/models';
 import type { UiClickConfig } from '../executors/types';
 import type { TimelineItem } from '../core/timeline';
-import type { ContentCommand, ContentReply, PageProbe, ScrollTo } from '../messaging/protocol';
+import type {
+  ContentCommand,
+  ContentReply,
+  PageProbe,
+  ScrollTo,
+  TabState,
+} from '../messaging/protocol';
+import type { SweepTab } from '../core/xurl';
 
 export interface Worker {
   windowId: number;
@@ -111,6 +118,17 @@ export async function scrollOnTab(tabId: number, to: ScrollTo): Promise<void> {
   await send(tabId, { type: 'SCROLL', to });
 }
 
+/** 프로필 타임라인 탭을 맞춘다 (ADR-0016). sort는 실행당 한 번만 true */
+export async function ensureTabOnTab(
+  tabId: number,
+  tab: SweepTab,
+  sort: boolean,
+): Promise<TabState> {
+  const reply = await send(tabId, { type: 'ENSURE_TAB', tab, sort });
+  if (reply.type !== 'TAB') throw new Error('예상치 못한 응답');
+  return reply.tab;
+}
+
 export async function reloadTab(tabId: number): Promise<void> {
   await browser.tabs.reload(tabId);
   await waitComplete(tabId);
@@ -122,6 +140,17 @@ export async function deleteOnTab(
   config: UiClickConfig,
 ): Promise<ExecutionResult> {
   const reply = await send(tabId, { type: 'DELETE_POST', postId, config });
+  if (reply.type !== 'DELETE') throw new Error('예상치 못한 응답');
+  return reply.result;
+}
+
+/** 내가 누른 재게시를 취소한다. 삭제와 경로가 아예 다르다 (ADR-0016) */
+export async function unrepostOnTab(
+  tabId: number,
+  postId: string,
+  config: UiClickConfig,
+): Promise<ExecutionResult> {
+  const reply = await send(tabId, { type: 'UNDO_REPOST', postId, config });
   if (reply.type !== 'DELETE') throw new Error('예상치 못한 응답');
   return reply.result;
 }

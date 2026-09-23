@@ -99,7 +99,7 @@ export function KeepFilterPanel({ mode, value, onChange, disabled = false }: Pro
             />
             답글
           </label>
-          <p className="muted small">리포스트는 어느 모드에서도 지우지 않습니다.</p>
+          <p className="muted small">아카이브 모드는 리포스트를 지우지 않습니다.</p>
         </>
       ))}
 

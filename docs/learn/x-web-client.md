@@ -44,10 +44,24 @@
 - 트윗 ID는 시간순 증가 → ID 비교 = 작성 시각 비교. 단 **문자열 비교는 틀린다**: 2017-11 이전은 18자리, 이후는 19자리라 `'934…'(2017) > '1734…'(2024)`로 뒤집힘
 - 정렬은 자릿수 먼저, 같으면 사전순(`core/order.ts`). BigInt 없이 정확하고 빠름
 
+## 프로필 탭 줄 (2026-09-23 확인, ko)
+- 탭은 `[role="tab"]` 앵커 4개: 맨 왼쪽(게시물/전체, `aria-haspopup="menu"`) · `/with_replies`(답글) · `/reposts`(재게시) · `/media`(미디어)
+- **`/with_replies`는 이제 답글만 나온다.** 2026-09-17에는 원글+답글이었다(ADR-0009이 그 전제로 쓰였다)
+- 맨 왼쪽 드롭다운 항목은 href 없는 `div[role="menuitem"]`: 전체 · 게시물 · 하이라이트 · 정렬 기준
+- "전체"를 고르면 주소가 `/<handle>/all`이 된다. **그 주소로 직접 들어가도 전체가 선택된다** → URL 한 번이면 끝
+- "정렬 기준" 하위 메뉴는 `[role="menuitemradio"]` 둘: "최신 순서"(기본 체크) · "인기"
+- 메뉴는 합성 Escape 이벤트로 안 닫힌다. `#layers`의 전면 배경을 눌러야 닫힌다
+
+## 재게시 취소 (2026-09-23 확인)
+- 내가 누른 재게시 버튼: `[data-testid="unretweet"]` (aria-label "801 재게시. 재게시함"). 안 누른 카드는 `retweet`
+- 누르면 메뉴가 열리고 `[data-testid="unretweetConfirm"]`("재게시 취소") 한 번으로 끝. **확인 시트 없음**
+- 리포스트 카드의 caret은 **원작성자 메뉴**(언팔로우·차단·신고)다. 재게시 취소에 caret을 쓰면 안 된다
+
 ## 타임라인(스윕 모드) 셀렉터
-- 스캔 페이지: `/<handle>/with_replies` — 원글과 답글이 한 타임라인에 나온다. 프로필 기본 탭에는 답글이 없다
+- 스캔 페이지: `/<handle>/all` — 원글·답글·리포스트·미디어가 한 타임라인에 나온다 (ADR-0016). 답글만 노리는 필터일 때만 `/with_replies`
 - 카드: `article[data-testid="tweet"]`
 - 카드의 permalink: **`<time>`을 품은 `a[href]`**. 인용글·부모글 링크가 같은 카드 안에 있으므로 `a[href*="/status/"]` 첫 번째를 쓰면 안 된다
-- 리포스트·고정글: `[data-testid="socialContext"]` 텍스트로 판정(`재게시`/`repost`, `고정`/`pinned`). 리포스트 카드의 permalink는 원작성자 handle이라 handle 비교로도 걸러진다
+- 리포스트·고정글: `[data-testid="socialContext"]` 텍스트로 판정(`재게시`/`repost`, `고정`/`pinned`)
+- 리포스트 카드의 permalink는 **원작성자 handle**이다. 그래서 "내 글인가"를 handle로 물을 수 없고, 대신 `unretweet` 버튼의 존재를 증거로 쓴다 (ADR-0016)
 - 로그인 계정: `[data-testid="AppTabBar_Profile_Link"]`의 href(`/<handle>`). 스윕 대상 계정을 여기서만 정한다
 - 삭제는 상태 페이지와 동일한 경로가 타임라인에서도 통한다(카드 안 caret → 메뉴 → 확인). `deletePost`를 그대로 재사용

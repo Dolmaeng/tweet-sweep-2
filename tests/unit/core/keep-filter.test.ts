@@ -11,6 +11,7 @@ import {
   flagReason,
   isFilterActive,
   isKeptSweep,
+  sweepTabOf,
   isValidRegex,
   keepReasons,
   selectTargets,
@@ -214,5 +215,19 @@ describe('저장값 보정', () => {
   it('kinds가 배열이면 비어 있어도 존중한다', () => {
     expect(coerceKeepFilter({ kinds: [] }).kinds).toEqual([]);
     expect(coerceKeepFilter({}).kinds).toEqual(['post', 'reply']);
+  });
+});
+
+describe('sweepTabOf (ADR-0016)', () => {
+  it('기본은 전체 탭 — 원글·미디어·리포스트가 다 거기 있다', () => {
+    expect(sweepTabOf(NO_KEEP_FILTER)).toBe('all');
+  });
+
+  it('멘션만 포함일 때만 답글 탭으로 간다', () => {
+    expect(sweepTabOf({ ...NO_KEEP_FILTER, mention: 'only' })).toBe('with_replies');
+  });
+
+  it('멘션 제외는 전체 탭이다 — 답글 아닌 글을 지우겠다는 뜻이므로', () => {
+    expect(sweepTabOf({ ...NO_KEEP_FILTER, mention: 'exclude' })).toBe('all');
   });
 });
