@@ -42,6 +42,14 @@ export function sweepTabPath(username: string, tab: SweepTab): string {
   return `/${username}/${tab === 'with_replies' ? 'with_replies' : 'all'}`;
 }
 
+/**
+ * 지금 주소가 그 탭인가. **대소문자는 무시한다** — X는 handle 표기를 그대로 두거나
+ * 정규화하거나 둘 다 한다. 표기 차이로 실행을 멈추면 멀쩡한 작업이 밤중에 죽는다.
+ */
+export function isSweepTabPath(pathname: string, username: string, tab: SweepTab): boolean {
+  return pathname.toLowerCase() === sweepTabPath(username, tab).toLowerCase();
+}
+
 /** GraphQL DeleteTweet 뮤테이션 URL인가. queryId는 배포마다 회전하므로 연산명으로 판별 */
 export function isGraphqlDelete(url: string): boolean {
   return graphqlOperation(url) === 'DeleteTweet';

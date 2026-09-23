@@ -13,7 +13,7 @@ import { PRESETS, withCustomInterval } from '../core/pacing';
 import { decide, pacingDelayMs, type RunSnapshot } from '../core/scheduler';
 import { isFilterActive, isKeptSweep, sweepTabOf, type KeepFilter } from '../core/keep-filter';
 import { nextRecovery, pickSweepTarget, sweepActionOf } from '../core/timeline';
-import { sweepTabPath, sweepTimelineUrl } from '../core/xurl';
+import { isSweepTabPath, sweepTimelineUrl } from '../core/xurl';
 import { DEFAULT_UI_CONFIG } from '../executors/types';
 import { appendAudit, itemStatusOf, upsertJobItem, setJobStatus } from './db';
 import type { BudgetSnapshot, RunControls } from './runner';
@@ -178,7 +178,7 @@ export async function runSweep(
         sortChecked = true;
         if (tabState.sortChanged) onEvent({ type: 'searching', note: '정렬을 최신순으로 맞춤' });
         // 주소가 그 탭이 아니면 **엉뚱한 타임라인을 지우게 된다.** 이건 계속하면 안 된다
-        if (tabState.path !== sweepTabPath(ctx.username, tab)) {
+        if (!isSweepTabPath(tabState.path, ctx.username, tab)) {
           await setJobStatus(ctx.job.id, 'halted');
           onEvent({
             type: 'ended',

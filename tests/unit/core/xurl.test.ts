@@ -3,6 +3,7 @@ import {
   allTabUrl,
   graphqlOperation,
   isGraphqlDelete,
+  isSweepTabPath,
   profileUrl,
   statusUrl,
   sweepTabPath,
@@ -49,5 +50,19 @@ describe('스윕 타임라인 주소 (ADR-0016)', () => {
   it('탭이 선택됐을 때의 경로 — 주소가 맞는지 검사하는 근거', () => {
     expect(sweepTabPath('gujik_man', 'all')).toBe('/gujik_man/all');
     expect(sweepTabPath('gujik_man', 'with_replies')).toBe('/gujik_man/with_replies');
+  });
+});
+
+describe('isSweepTabPath', () => {
+  it('대소문자 차이로 실행을 멈추지 않는다', () => {
+    expect(isSweepTabPath('/Gujik_Man/all', 'gujik_man', 'all')).toBe(true);
+    expect(isSweepTabPath('/gujik_man/all', 'gujik_man', 'all')).toBe(true);
+  });
+
+  it('다른 탭이면 false — 엉뚱한 타임라인에서 지우면 안 된다', () => {
+    expect(isSweepTabPath('/gujik_man', 'gujik_man', 'all')).toBe(false);
+    expect(isSweepTabPath('/gujik_man/media', 'gujik_man', 'all')).toBe(false);
+    expect(isSweepTabPath('/gujik_man/with_replies', 'gujik_man', 'all')).toBe(false);
+    expect(isSweepTabPath('/someone/all', 'gujik_man', 'all')).toBe(false);
   });
 });
