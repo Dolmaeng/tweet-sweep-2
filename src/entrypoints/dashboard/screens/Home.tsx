@@ -40,7 +40,7 @@ export function Home({
             <tr>
               <th>계정</th>
               <th>전체</th>
-              <th>대상(원글+답글)</th>
+              <th>최대 대상(원글+답글)</th>
               <th>가져온 날</th>
               <th></th>
             </tr>
